@@ -1,0 +1,362 @@
+<div class="dashboard-container">
+  <!-- Navbar -->
+  <nav class="dashboard-nav">
+    <div class="nav-inner">
+      <a routerLink="/" class="nav-brand">
+        <span class="material-icons">assessment</span>
+        <span>RegReportX</span>
+      </a>
+      <div class="nav-right">
+        <div class="user-badge">
+          <span class="material-icons">person</span>
+          {{ username }}
+        </div>
+        <span class="role-tag">Compliance Analyst</span>
+        <button class="logout-btn" (click)="logout()">
+          <span class="material-icons">logout</span>
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-content">
+    <div class="dashboard-header">
+      <h1>Compliance Analyst Dashboard</h1>
+      <p>Data quality, validation & report submission</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-container">
+      <button class="tab-btn" [class.active]="activeTab === 'validation'" (click)="switchTab('validation')">
+        <span class="material-icons">verified</span>
+        Data Validation
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'quality'" (click)="switchTab('quality')">
+        <span class="material-icons">bug_report</span>
+        Quality Issues
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'submit'" (click)="switchTab('submit')">
+        <span class="material-icons">send</span>
+        Submit Reports
+      </button>
+    </div>
+
+    <!-- Tab Content: Validation -->
+    <div class="tab-pane" *ngIf="activeTab === 'validation'">
+      <div class="card selector-card">
+        <div class="card-header-row">
+          <h3><span class="material-icons">verified</span> Validation Controls</h3>
+          <button class="action-btn primary" (click)="runValidationCheck()" [disabled]="isLoading">
+            <span class="material-icons">play_arrow</span>
+            Run Automated Validation
+          </button>
+        </div>
+      </div>
+
+
+      <div class="charts-grid" *ngIf="issues.length > 0">
+        <!-- Severity Bar Chart -->
+        <div class="card chart-card">
+          <div class="card-header-row" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3><span class="material-icons">bar_chart</span> Severity Breakdown</h3>
+          </div>
+          <div class="chart-body">
+            <canvas id="severityChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Issues by Rule Doughnut Chart -->
+        <div class="card chart-card">
+          <div class="card-header-row" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3><span class="material-icons">donut_large</span> Issues by Rule</h3>
+          </div>
+          <div class="chart-body">
+            <canvas id="messageChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Status Distribution Pie Chart -->
+        <div class="card chart-card">
+          <div class="card-header-row" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <h3><span class="material-icons">pie_chart</span> Status Distribution</h3>
+          </div>
+          <div class="chart-body">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="card" *ngIf="issues.length > 0 || isLoading">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Rule</th>
+                <th>Record ID</th>
+                <th>Message</th>
+                <th>Severity</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let issue of paginatedIssues">
+                <td><span class="id-badge">{{ issue.issueId }}</span></td>
+                <td><span class="type-badge">{{ issue.rule?.name }}</span></td>
+                <td class="code-cell">{{ issue.recordId }}</td>
+                <td>{{ issue.message }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="{
+                    'status-danger': issue.severity === 'CRITICAL' || issue.severity === 'HIGH',
+                    'status-warning': issue.severity === 'WARNING' || issue.severity === 'MEDIUM',
+                    'status-info': issue.severity === 'LOW'
+                  }">{{ issue.severity }}</span>
+                </td>
+                <td>
+                  <span class="status-badge" [ngClass]="issue.status === 'OPEN' ? 'status-danger' : 'status-success'">
+                    {{ issue.status }}
+                  </span>
+                </td>
+              </tr>
+              <tr *ngIf="issues.length === 0 && !isLoading">
+                <td colspan="6" class="empty-state">
+                  <span class="material-icons">task_alt</span>
+                  <p>No validation issues found. System is compliant.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div class="pagination-footer" *ngIf="issues.length > 0">
+          <div class="pagination-info">
+            Showing {{ (currentPage - 1) * pageSize + 1 }} to {{ Math.min(currentPage * pageSize, issues.length) }} of {{ issues.length }} records
+          </div>
+          <div class="pagination-actions">
+            <button class="action-btn outline small" (click)="prevPage()" [disabled]="currentPage === 1">
+              <span class="material-icons">chevron_left</span> Prev
+            </button>
+            <span class="page-indicator">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button class="action-btn outline small" (click)="nextPage()" [disabled]="currentPage === totalPages">
+              Next <span class="material-icons">chevron_right</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Tab Content: Quality Issues -->
+    <div class="tab-pane" *ngIf="activeTab === 'quality'">
+      <div class="card">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Batch</th>
+                <th>Message</th>
+                <th>Record ID</th>
+                <th>Severity</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let issue of openIssues">
+                <td><span class="id-badge">{{ issue.issueId }}</span></td>
+                <td>Batch #{{ issue.batch?.batchId }}</td>
+                <td>{{ issue.message }}</td>
+                <td class="code-cell">{{ issue.recordId }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="{
+                    'status-danger': issue.severity === 'Critical',
+                    'status-warning': issue.severity === 'High',
+                    'status-info': issue.severity === 'Medium'
+                  }">{{ issue.severity }}</span>
+                </td>
+                <td>
+                  <button class="action-btn small success" (click)="openResolveModal(issue)">
+                    <span class="material-icons">check</span>
+                    Resolve
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="openIssues.length === 0 && !isLoading">
+                <td colspan="6" class="empty-state">
+                  <span class="material-icons">done_all</span>
+                  <p>No open quality issues to resolve.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Content: Submit Reports -->
+    <div class="tab-pane" *ngIf="activeTab === 'submit'">
+      
+      <!-- Exceptions Section -->
+      <div class="card" style="border-left: 4px solid var(--danger);">
+        <div class="card-header-row" style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+          <h3><span class="material-icons" style="color: var(--danger);">report_problem</span> Report Exceptions</h3>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Report ID</th>
+                <th>Field</th>
+                <th>Issue</th>
+                <th>Severity</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let ex of openExceptions">
+                <td><span class="id-badge">{{ ex.exceptionId }}</span></td>
+                <td><span class="type-badge">Report #{{ ex.report?.reportId }}</span></td>
+                <td class="code-cell">{{ ex.templateField?.fieldName || 'System' }}</td>
+                <td>{{ ex.issue }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="{
+                    'status-danger': ex.severity === 'Critical',
+                    'status-warning': ex.severity === 'High',
+                    'status-info': ex.severity === 'Medium'
+                  }">{{ ex.severity }}</span>
+                </td>
+                <td>
+                  <button class="action-btn small success" (click)="openResolveExceptionModal(ex)">
+                    <span class="material-icons">check</span>
+                    Resolve
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="openExceptions.length === 0 && !isLoading">
+                <td colspan="6" class="empty-state">
+                  <span class="material-icons">verified</span>
+                  <p>No open report exceptions. Ready for submission.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Draft Reports Section -->
+      <div class="card" style="margin-top: 1.5rem;">
+         <div class="card-header-row" style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+          <h3><span class="material-icons" style="color: var(--primary);">send</span> Reports Ready For Review</h3>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Template</th>
+                <th>Period</th>
+                <th>Generated Date</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let report of draftReports">
+                <td><span class="id-badge">{{ report.reportId }}</span></td>
+                <td class="code-cell">{{ report.template?.regulationCode }}</td>
+                <td>{{ report.period }}</td>
+                <td>{{ report.generatedDate | date:'medium' }}</td>
+                <td>
+                  <span class="status-badge status-warning">{{ report.status }}</span>
+                </td>
+                <td>
+                  <!-- Disabled if there are exceptions -->
+                  <button class="action-btn small primary" [disabled]="openExceptions.length > 0" (click)="submitForApproval(report.reportId!)">
+                    <span class="material-icons">send</span>
+                    Submit for Review
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="draftReports.length === 0 && !isLoading">
+                <td colspan="6" class="empty-state">
+                  <span class="material-icons">description</span>
+                  <p>No draft reports found for submission.</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resolve Issue Modal -->
+  <div class="modal-overlay" *ngIf="showResolveModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Resolve Data Quality Issue #{{ selectedIssue?.issueId }}</h2>
+        <button class="close-btn" (click)="showResolveModal = false">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Corrected Value</label>
+          <input type="text" [(ngModel)]="resolutionForm.correctedValue" placeholder="Enter the correct value...">
+        </div>
+        <div class="form-group">
+          <label>Justification</label>
+          <textarea [(ngModel)]="resolutionForm.justification" placeholder="Provide a reason for this correction..." rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="action-btn outline" (click)="showResolveModal = false">Cancel</button>
+        <button class="action-btn primary" (click)="submitResolution()" [disabled]="!resolutionForm.justification">
+          Submit Correction
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resolve Exception Modal -->
+  <div class="modal-overlay" *ngIf="showExceptionModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Resolve Report Exception #{{ selectedException?.exceptionId }}</h2>
+        <button class="close-btn" (click)="showExceptionModal = false">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+         <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-secondary);">
+           <strong>Issue:</strong> {{ selectedException?.issue }}
+         </p>
+        <div class="form-group">
+          <label>Resolution Justification</label>
+          <textarea [(ngModel)]="exceptionForm.justification" placeholder="Provide a reason to accept this risk and resolve the exception..." rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="action-btn outline" (click)="showExceptionModal = false">Cancel</button>
+        <button class="action-btn primary" (click)="submitExceptionResolution()" [disabled]="!exceptionForm.justification">
+          Accept Risk & Resolve
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" *ngIf="notification" [ngClass]="'toast-' + notification.type">
+    <span class="material-icons">{{ notification.type === 'success' ? 'check_circle' : 'error' }}</span>
+    {{ notification.message }}
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+  </div>
+</div>

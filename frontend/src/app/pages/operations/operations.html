@@ -1,0 +1,55 @@
+<div>
+  <nav class="dashboard-nav">
+    <div class="nav-inner">
+      <a routerLink="/" class="nav-brand">
+        <span class="material-icons">assessment</span>
+        <span>RegReportX</span>
+      </a>
+      <div class="nav-right">
+        <div class="user-badge">
+          <span class="material-icons">person</span>
+          {{ username }}
+        </div>
+        <span class="role-tag">Operations Officer</span>
+        <button class="logout-btn" (click)="logout()">
+          <span class="material-icons">logout</span>
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-content">
+    <div class="dashboard-header">
+      <h1>Operations Officer Dashboard</h1>
+      <p>Data ingestion & source data management</p>
+    </div>
+
+    <div class="modules-grid">
+      <div class="module-card">
+        <div class="module-icon blue">
+          <span class="material-icons">cloud_upload</span>
+        </div>
+        <h3>Data Ingestion</h3>
+        <p>Run batch ingestion to pull raw data from configured data sources.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+      <div class="module-card">
+        <div class="module-icon green">
+          <span class="material-icons">upload_file</span>
+        </div>
+        <h3>CSV Upload</h3>
+        <p>Upload CSV files to import source data into the system for processing.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+      <div class="module-card">
+        <div class="module-icon orange">
+          <span class="material-icons">storage</span>
+        </div>
+        <h3>Source Data</h3>
+        <p>View loans, deposits, treasury trades, and general ledger records.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+    </div>
+  </div>
+</div>
