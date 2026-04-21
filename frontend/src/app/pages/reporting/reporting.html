@@ -1,0 +1,55 @@
+<div>
+  <nav class="dashboard-nav">
+    <div class="nav-inner">
+      <a routerLink="/" class="nav-brand">
+        <span class="material-icons">assessment</span>
+        <span>RegReportX</span>
+      </a>
+      <div class="nav-right">
+        <div class="user-badge">
+          <span class="material-icons">person</span>
+          {{ username }}
+        </div>
+        <span class="role-tag">Reporting Officer</span>
+        <button class="logout-btn" (click)="logout()">
+          <span class="material-icons">logout</span>
+          Logout
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-content">
+    <div class="dashboard-header">
+      <h1>Reporting Officer Dashboard</h1>
+      <p>Report generation & filing</p>
+    </div>
+
+    <div class="modules-grid">
+      <div class="module-card">
+        <div class="module-icon blue">
+          <span class="material-icons">note_add</span>
+        </div>
+        <h3>Generate Reports</h3>
+        <p>Generate new regulatory reports based on templates and ingested source data.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+      <div class="module-card">
+        <div class="module-icon green">
+          <span class="material-icons">publish</span>
+        </div>
+        <h3>File Reports</h3>
+        <p>File approved reports to mark them as officially submitted to regulators.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+      <div class="module-card">
+        <div class="module-icon orange">
+          <span class="material-icons">visibility</span>
+        </div>
+        <h3>View Reports</h3>
+        <p>Access and track all reports through their lifecycle stages.</p>
+        <span class="module-status"><span class="material-icons">check_circle</span> Available</span>
+      </div>
+    </div>
+  </div>
+</div>
