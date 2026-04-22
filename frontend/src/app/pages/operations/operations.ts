@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
+=======
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -51,6 +55,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   // Raw Records Conversion
   convertingBatchId: number | null = null;
   isConvertingRawRecords = false;
+<<<<<<< HEAD
   convertedBatchIds: Set<number> = new Set();
 
   private readonly STORAGE_KEY = 'rrx_converted_batch_ids';
@@ -78,11 +83,24 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     loans: null, deposits: null, treasury: null, gl: null
   };
 
+=======
+  conversionProgress: number = 0;
+  conversionMessage: string = '';
+
+  // Ingestion & Uploads - Fully initialized to prevent undefined errors
+  ingestionBatches: RawDataBatch[] = [];
+  
+  uploadFiles: Record<UploadType, File | null> = {
+    loans: null, deposits: null, treasury: null, gl: null
+  };
+  
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   uploading: Record<UploadType, boolean> = {
     loans: false, deposits: false, treasury: false, gl: false
   };
 
   // Upload/Ingestion result tracking
+<<<<<<< HEAD
   ingestionResult: { success: boolean; message: string; recordsCount?: number } | null = null;
   showIngestionResult = false;
 
@@ -91,6 +109,14 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     visible: false, success: false, message: '', type: ''
   };
 
+=======
+  uploadProgress: Record<UploadType, number> = {
+    loans: 0, deposits: 0, treasury: 0, gl: 0
+  };
+  ingestionResult: { success: boolean; message: string; recordsCount?: number } | null = null;
+  showIngestionResult = false;
+
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   auditLogs: AuditLog[] = [];
   auditSearchTerm = '';
   auditPage = 1;
@@ -116,6 +142,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     public authService: AuthService,
     private operationsService: OperationsService,
+<<<<<<< HEAD
     private router: Router,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -136,6 +163,13 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.username = this.authService.getUsername() || 'Officer';
     this.loadConvertedIds();
+=======
+    private router: Router
+  ) {}
+
+  ngOnInit(): void {
+    this.username = this.authService.getUsername() || 'Officer';
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     this.loadDashboardData();
   }
 
@@ -164,6 +198,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       gl: this.operationsService.getGl()
     }).pipe(
       finalize(() => {
+<<<<<<< HEAD
         this.run(() => {
           this.isRefreshingStats = false;
           this.updateChart();
@@ -171,10 +206,18 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
             this.renderSourceDistChart();
             this.renderBatchStatusChart();
           });
+=======
+        this.isRefreshingStats = false;
+        this.updateChart();
+        setTimeout(() => {
+          this.renderSourceDistChart();
+          this.renderBatchStatusChart();
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
         });
       })
     ).subscribe({
       next: (res) => {
+<<<<<<< HEAD
         this.run(() => {
           this.totalLoans = res.loans.length;
           this.totalDeposits = res.deposits.length;
@@ -183,12 +226,21 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       },
       error: () => this.run(() => this.showNotification('Error loading counts.', 'error'))
+=======
+        this.totalLoans = res.loans.length;
+        this.totalDeposits = res.deposits.length;
+        this.totalTreasury = res.treasury.length;
+        this.totalGl = res.gl.length;
+      },
+      error: () => this.showNotification('Error loading counts.', 'error')
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     });
   }
 
   loadIngestionBatches(): void {
     this.isLoadingBatches = true;
     this.operationsService.getIngestionBatches().pipe(
+<<<<<<< HEAD
       finalize(() => this.run(() => this.isLoadingBatches = false))
     ).subscribe({
       next: data => {
@@ -212,6 +264,22 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
           this.completedBatches = 0;
           this.totalRecords = 0;
         });
+=======
+      finalize(() => this.isLoadingBatches = false)
+    ).subscribe({
+      next: data => {
+        this.ingestionBatches = data;
+        this.totalBatches = data.length;
+        this.completedBatches = data.filter(b => b.status === 'COMPLETED').length;
+        this.totalRecords = data.reduce((sum, b) => sum + (b.rowCount || 0), 0);
+        setTimeout(() => this.renderBatchStatusChart());
+      },
+      error: () => {
+        this.ingestionBatches = [];
+        this.totalBatches = 0;
+        this.completedBatches = 0;
+        this.totalRecords = 0;
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
       }
     });
   }
@@ -225,21 +293,33 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       setTimeout(() => this.initChart(), 50);
     }
     if (tab === 'audit') this.loadAuditLogs();
+<<<<<<< HEAD
     this.cdr.detectChanges();
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   }
 
   switchDataTab(tab: any): void {
     this.activeDataTab = tab;
     this.currentPage = 1;
+<<<<<<< HEAD
     this.isLoadingData = true;
     this.cdr.detectChanges();
 
+=======
+    
+    this.isLoadingData = true;
+    
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     if (tab === 'raw') {
       if (this.selectedBatchIdForRaw) {
         this.fetchRawRecordsByBatch();
       } else {
         this.isLoadingData = false;
+<<<<<<< HEAD
         this.cdr.detectChanges();
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
       }
       return;
     }
@@ -255,6 +335,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       req = this.operationsService.getGl();
     }
 
+<<<<<<< HEAD
     req.pipe(
       finalize(() => this.run(() => this.isLoadingData = false))
     ).subscribe({
@@ -267,18 +348,36 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       },
       error: () => this.run(() => this.showNotification('Error loading data.', 'error'))
+=======
+    req.pipe(finalize(() => this.isLoadingData = false)).subscribe({
+      next: (data: any) => {
+        if (tab === 'loans') this.loans = data;
+        else if (tab === 'deposits') this.deposits = data;
+        else if (tab === 'treasury') this.treasury = data;
+        else if (tab === 'gl') this.gl = data;
+      },
+      error: () => this.showNotification('Error loading data.', 'error')
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     });
   }
 
   fetchRawRecordsByBatch(): void {
     if (!this.selectedBatchIdForRaw) return;
     this.isLoadingData = true;
+<<<<<<< HEAD
     this.cdr.detectChanges();
     this.operationsService.getRawRecordsByBatch(this.selectedBatchIdForRaw).pipe(
       finalize(() => this.run(() => this.isLoadingData = false))
     ).subscribe({
       next: data => this.run(() => this.rawRecords = data),
       error: () => this.run(() => this.showNotification('Records not found.', 'error'))
+=======
+    this.operationsService.getRawRecordsByBatch(this.selectedBatchIdForRaw).pipe(
+      finalize(() => this.isLoadingData = false)
+    ).subscribe({
+      next: data => this.rawRecords = data,
+      error: () => this.showNotification('Records not found.', 'error')
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     });
   }
 
@@ -286,11 +385,15 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.activeTab = 'view_data';
     this.activeDataTab = 'raw';
     this.selectedBatchIdForRaw = batchId;
+<<<<<<< HEAD
     this.cdr.detectChanges();
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     this.fetchRawRecordsByBatch();
   }
 
   loadRawRecordsForConversion(batchId: number): void {
+<<<<<<< HEAD
     if (this.isConvertingRawRecords) return; // guard double-click
     this.convertingBatchId = batchId;
     this.isConvertingRawRecords = true;
@@ -327,6 +430,28 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
             type: 'Conversion'
           };
         });
+=======
+    this.convertingBatchId = batchId;
+    this.isConvertingRawRecords = true;
+    this.conversionProgress = 10;
+    this.conversionMessage = 'Converting batch to raw records...';
+
+    this.operationsService.loadRawRecords(batchId).pipe(
+      finalize(() => {
+        this.isConvertingRawRecords = false;
+        this.convertingBatchId = null;
+        this.conversionProgress = 0;
+        this.conversionMessage = '';
+      })
+    ).subscribe({
+      next: (result: any) => {
+        this.conversionProgress = 100;
+        this.showNotification(`Successfully converted batch ${batchId}!`, 'success');
+        setTimeout(() => this.loadIngestionBatches(), 300);
+      },
+      error: (err) => {
+        this.showNotification(`Conversion failed for batch ${batchId}`, 'error');
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
       }
     });
   }
@@ -335,6 +460,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   uploadCsv(type: string): void {
     const key = type as UploadType;
     const file = this.uploadFiles[key];
+<<<<<<< HEAD
     if (!file || this.uploading[key]) return;  // guard double-click
 
     this.uploading[key] = true;
@@ -383,18 +509,56 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       this.uploadFiles[type as UploadType] = file;
       this.cdr.detectChanges();
     }
+=======
+    if (!file) return;
+
+    this.uploading[key] = true;
+    this.uploadProgress[key] = 10;
+    const apiEndpoint: 'loans' | 'deposits' | 'treasury' | 'general-ledger' = type === 'gl' ? 'general-ledger' : (type as 'loans' | 'deposits' | 'treasury');
+
+    const progressInterval = setInterval(() => {
+      if (this.uploadProgress[key] < 90) {
+        this.uploadProgress[key] += Math.random() * 20;
+      }
+    }, 300);
+
+    this.operationsService.uploadCsv(apiEndpoint, file).pipe(
+      finalize(() => {
+        clearInterval(progressInterval);
+        this.uploadProgress[key] = 100;
+        this.uploading[key] = false;
+        setTimeout(() => this.uploadProgress[key] = 0, 1000);
+      })
+    ).subscribe({
+      next: (response) => {
+        this.showNotification(`${type} uploaded successfully! ${response.recordsInserted} records inserted.`, 'success');
+        this.clearFile(key);
+        this.loadSourceCounts();
+      },
+      error: () => this.showNotification(`Upload failed for ${type}.`, 'error')
+    });
+  }
+
+  onFileSelected(event: any, type: string): void {
+    const file = event.target.files[0];
+    if (file) this.uploadFiles[type as UploadType] = file;
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   }
 
   clearFile(type: UploadType): void {
     this.uploadFiles[type] = null;
     const input = document.getElementById(`file-${type}`) as HTMLInputElement;
     if (input) input.value = '';
+<<<<<<< HEAD
     this.cdr.detectChanges();
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   }
 
   // --- Audit Logic ---
   loadAuditLogs(): void {
     this.isLoadingAudit = true;
+<<<<<<< HEAD
     this.cdr.detectChanges();
     this.operationsService.getAllAuditLogs().pipe(
       finalize(() => this.run(() => this.isLoadingAudit = false))
@@ -406,6 +570,14 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       },
       error: () => this.run(() => this.showNotification('Error loading audit logs.', 'error'))
+=======
+    this.operationsService.getAllAuditLogs().pipe(finalize(() => this.isLoadingAudit = false)).subscribe({
+      next: data => {
+        this.auditLogs = data;
+        this.auditPage = 1;
+      },
+      error: () => this.showNotification('Error loading audit logs.', 'error')
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     });
   }
 
@@ -429,6 +601,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     return Math.ceil(this.filteredAuditLogs.length / this.auditPageSize) || 1;
   }
 
+<<<<<<< HEAD
   onAuditSearch(): void { this.auditPage = 1; this.cdr.detectChanges(); }
   auditPrev(): void {
     if (this.auditPage > 1) { this.auditPage--; this.cdr.detectChanges(); }
@@ -436,6 +609,11 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   auditNext(): void {
     if (this.auditPage < this.auditTotalPages) { this.auditPage++; this.cdr.detectChanges(); }
   }
+=======
+  onAuditSearch(): void { this.auditPage = 1; }
+  auditPrev(): void { if (this.auditPage > 1) this.auditPage--; }
+  auditNext(): void { if (this.auditPage < this.auditTotalPages) this.auditPage++; }
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
 
   getActionLabel(action: string): string {
     const map: Record<string, string> = {
@@ -478,6 +656,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'info';
   }
 
+<<<<<<< HEAD
   // --- Computed Dashboard Stats ---
   get totalSourceRecords(): number {
     return this.totalLoans + this.totalDeposits + this.totalTreasury + this.totalGl;
@@ -491,6 +670,8 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     return batch.status === 'COMPLETED' || this.convertedBatchIds.has(batch.batchId);
   }
 
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   // --- Helper Methods ---
   private get activeArray(): any[] {
     if (this.activeDataTab === 'loans') return this.loans;
@@ -508,6 +689,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   get totalPages(): number { return Math.ceil(this.activeArray.length / this.pageSize) || 1; }
   get totalItemCount(): number { return this.activeArray.length; }
 
+<<<<<<< HEAD
   prevPage(): void {
     if (this.currentPage > 1) { this.currentPage--; this.cdr.detectChanges(); }
   }
@@ -521,6 +703,14 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       this.notification = null;
       this.cdr.detectChanges();
     }, 3000);
+=======
+  prevPage(): void { if (this.currentPage > 1) this.currentPage--; }
+  nextPage(): void { if (this.currentPage < this.totalPages) this.currentPage++; }
+
+  showNotification(message: string, type: 'success' | 'error'): void {
+    this.notification = { message, type };
+    setTimeout(() => this.notification = null, 3000);
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
   }
 
   // --- Charts ---
@@ -559,6 +749,10 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     const ctx = document.getElementById('sourceDistChart') as HTMLCanvasElement;
     if (!ctx) return;
     this.sourceDistChart?.destroy();
+<<<<<<< HEAD
+=======
+    const total = this.totalLoans + this.totalDeposits + this.totalTreasury + this.totalGl;
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     this.sourceDistChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
@@ -612,6 +806,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isIngesting = true;
     this.showIngestionResult = false;
     this.ingestionResult = null;
+<<<<<<< HEAD
     this.cdr.detectChanges();
 
     this.operationsService.runIngestion().pipe(
@@ -639,6 +834,28 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
           this.showIngestionResult = true;
           this.showNotification('Ingestion failed.', 'error');
         });
+=======
+    
+    this.operationsService.runIngestion().pipe(finalize(() => this.isIngesting = false)).subscribe({
+      next: (batches) => {
+        const totalRecords = batches.reduce((sum, b) => sum + (b.rowCount || 0), 0);
+        this.ingestionResult = {
+          success: true,
+          message: `Ingestion completed successfully!`,
+          recordsCount: totalRecords
+        };
+        this.showIngestionResult = true;
+        this.showNotification('Ingestion successful!', 'success');
+        this.loadIngestionBatches();
+      },
+      error: (err) => {
+        this.ingestionResult = {
+          success: false,
+          message: 'Ingestion failed. Please check the logs and try again.'
+        };
+        this.showIngestionResult = true;
+        this.showNotification('Ingestion failed.', 'error');
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
       }
     });
   }

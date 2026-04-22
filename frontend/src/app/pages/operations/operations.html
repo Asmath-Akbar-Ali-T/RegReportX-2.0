@@ -43,6 +43,7 @@
       </div>
     }
 
+<<<<<<< HEAD
     <!-- ==================== RESULT MODAL ==================== -->
     @if (uploadModal.visible) {
       <div class="modal-overlay" (click)="closeUploadModal()">
@@ -60,19 +61,29 @@
       </div>
     }
 
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
     <!-- ==================== DASHBOARD ==================== -->
     @if (activeTab === 'dashboard') {
       <div class="content-header">
         <div>
           <h1>Operations Dashboard</h1>
+<<<<<<< HEAD
           <p>Data pipeline monitoring &amp; source record statistics</p>
         </div>
         <button class="action-btn outline" (click)="loadDashboardData()" [disabled]="isLoadingBatches">
           <span class="material-icons">refresh</span> {{ isLoadingBatches ? 'Loading...' : 'Refresh' }}
+=======
+          <p>Data pipeline monitoring & source record statistics</p>
+        </div>
+        <button class="action-btn outline" (click)="loadDashboardData()">
+          <span class="material-icons" [class.rotating]="isLoadingBatches">refresh</span> Refresh
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
         </button>
       </div>
       <div class="stats-grid">
         <div class="stat-card blue">
+<<<<<<< HEAD
           <div class="stat-icon"><span class="material-icons">account_balance</span></div>
           <div class="stat-content">
             <h3>Total Loans</h3>
@@ -103,6 +114,22 @@
             <div class="stat-value">{{ totalGl }}</div>
             <div class="stat-sub">General ledger entries</div>
           </div>
+=======
+          <div class="stat-icon"><span class="material-icons">inventory_2</span></div>
+          <div class="stat-content"><h3>Total Batches</h3><div class="stat-value">{{ totalBatches }}</div></div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon"><span class="material-icons">check_circle</span></div>
+          <div class="stat-content"><h3>Completed</h3><div class="stat-value">{{ completedBatches }}</div></div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-icon"><span class="material-icons">dataset</span></div>
+          <div class="stat-content"><h3>Total Records</h3><div class="stat-value">{{ totalRecords }}</div></div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon"><span class="material-icons">source</span></div>
+          <div class="stat-content"><h3>Data Sources</h3><div class="stat-value">4</div></div>
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
         </div>
       </div>
       <div class="charts-grid">
@@ -134,6 +161,7 @@
           <div class="card upload-card">
             <h3>{{ type | uppercase }} CSV</h3>
             <div class="upload-zone" [class.has-file]="uploadFiles[type]">
+<<<<<<< HEAD
               <input type="file" [id]="'file-'+type" accept=".csv"
                      (change)="onFileSelected($event, type)" class="file-input" />
               <label [for]="'file-'+type" class="file-label">
@@ -151,6 +179,27 @@
                 <button class="action-btn outline" (click)="clearFile(type)" title="Remove file">
                   <span class="material-icons">close</span>
                 </button>
+=======
+              <input type="file" [id]="'file-'+type" (change)="onFileSelected($event, type)" class="file-input" />
+              <label [for]="'file-'+type" class="file-label">
+                <span class="material-icons">cloud_upload</span>
+                <span>{{ uploadFiles[type]?.name || 'Select CSV' }}</span>
+              </label>
+              <div class="btn-group-row mt-3">
+                <button class="action-btn primary flex-1" (click)="uploadCsv(type)" [disabled]="!uploadFiles[type] || uploading[type]">
+                  @if (uploading[type]) { <span class="material-icons rotating">sync</span> } 
+                  @else { Upload }
+                </button>
+                @if (uploadFiles[type]) {
+                  <button class="action-btn outline" (click)="clearFile(type)">X</button>
+                }
+              </div>
+              @if (uploading[type] && uploadProgress[type] > 0) {
+                <div class="progress-bar mt-3">
+                  <div class="progress-fill" [style.width.%]="uploadProgress[type]"></div>
+                </div>
+                <p class="progress-text">{{ uploadProgress[type] | number:'1.0-0' }}%</p>
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
               }
             </div>
           </div>
@@ -166,7 +215,11 @@
           <p>Run the ingestion pipeline and monitor batch status</p>
         </div>
         <button class="action-btn success" (click)="runIngestion()" [disabled]="isIngesting">
+<<<<<<< HEAD
           {{ isIngesting ? 'Running...' : 'Run Pipeline' }}
+=======
+          @if (isIngesting) { <span class="material-icons rotating">sync</span> } @else { Run Pipeline }
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
         </button>
       </div>
 
@@ -198,7 +251,11 @@
                   <td><button class="action-btn outline small" (click)="loadRawRecordsAction(batch.batchId)">View</button></td>
                 </tr>
               }
+<<<<<<< HEAD
               @if (ingestionBatches.length === 0 && !isLoadingBatches) {
+=======
+              @if (ingestionBatches.length === 0) {
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
                 <tr><td colspan="6" class="empty-state"><span class="material-icons">sync</span><p>No batches found. Run the ingestion pipeline to create batches.</p></td></tr>
               }
             </tbody>
@@ -216,6 +273,7 @@
         </div>
       </div>
 
+<<<<<<< HEAD
       <div class="stats-grid">
         <div class="stat-card blue">
           <div class="stat-icon"><span class="material-icons">inventory_2</span></div>
@@ -234,6 +292,19 @@
           <div class="stat-content"><h3>Data Sources</h3><div class="stat-value">4</div></div>
         </div>
       </div>
+=======
+      @if (isConvertingRawRecords) {
+        <div class="card conversion-progress">
+          <div class="progress-container">
+            <h3>{{ conversionMessage }}</h3>
+            <div class="progress-bar large">
+              <div class="progress-fill" [style.width.%]="conversionProgress"></div>
+            </div>
+            <p class="progress-percentage">{{ conversionProgress | number:'1.0-0' }}%</p>
+          </div>
+        </div>
+      }
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
 
       <div class="card">
         <div class="table-container">
@@ -248,6 +319,7 @@
                   <td>{{ batch.rowCount }}</td>
                   <td><span class="status-badge" [class]="getStatusClass(batch.status)">{{ batch.status }}</span></td>
                   <td>
+<<<<<<< HEAD
                     <button class="action-btn small"
                             [class.success]="isBatchConverted(batch)"
                             [class.primary]="!isBatchConverted(batch)"
@@ -257,6 +329,13 @@
                         <span class="material-icons" style="font-size:15px">check_circle</span> Converted
                       } @else if (convertingBatchId === batch.batchId) {
                         Converting...
+=======
+                    <button class="action-btn primary small" 
+                            (click)="loadRawRecordsForConversion(batch.batchId)"
+                            [disabled]="isConvertingRawRecords || convertingBatchId === batch.batchId">
+                      @if (convertingBatchId === batch.batchId) {
+                        <span class="material-icons rotating">sync</span>
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
                       } @else {
                         Convert
                       }
@@ -264,9 +343,12 @@
                   </td>
                 </tr>
               }
+<<<<<<< HEAD
               @if (ingestionBatches.length === 0) {
                 <tr><td colspan="6" class="empty-state"><span class="material-icons">layers</span><p>No batches found. Run Data Ingestion first.</p></td></tr>
               }
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
             </tbody>
           </table>
         </div>
@@ -301,6 +383,7 @@
       }
 
       <div class="card">
+<<<<<<< HEAD
         @if (isLoadingData) {
           <div class="table-loading"><p>Loading data...</p></div>
         }
@@ -343,6 +426,41 @@
               </div>
             </div>
           }
+=======
+        <div class="table-container">
+          <table>
+            <thead>
+              @if (activeDataTab === 'loans') { <tr><th>Loan ID</th><th>Customer ID</th><th>Branch</th><th>Loan Type</th><th>Amount</th><th>Interest Rate</th><th>Currency</th><th>Status</th></tr> }
+              @if (activeDataTab === 'deposits') { <tr><th>Deposit ID</th><th>Customer ID</th><th>Branch</th><th>Deposit Type</th><th>Amount</th><th>Interest Rate</th><th>Open Date</th><th>Maturity Date</th></tr> }
+              @if (activeDataTab === 'treasury') { <tr><th>Trade ID</th><th>Instrument</th><th>Counterparty</th><th>Notional</th><th>Currency</th><th>Trade Date</th><th>Maturity Date</th></tr> }
+              @if (activeDataTab === 'gl') { <tr><th>GL ID</th><th>Account Number</th><th>Branch</th><th>Account Type</th><th>Debit</th><th>Credit</th><th>Currency</th><th>Transaction Date</th></tr> }
+              @if (activeDataTab === 'raw') { <tr><th>ID</th><th>Batch</th><th>Payload</th><th>Date</th></tr> }
+            </thead>
+            <tbody>
+              @for (item of paginatedData; track $index) {
+                <tr>
+                  @if (activeDataTab === 'loans') { <td>{{item.loanId}}</td><td>{{item.customerId}}</td><td>{{item.branchId}}</td><td>{{item.loanType}}</td><td>{{item.loanAmount | currency}}</td><td>{{item.interestRate}}%</td><td>{{item.currency}}</td><td><span class="status-badge" [class]="getStatusClass(item.status)">{{item.status}}</span></td> }
+                  @if (activeDataTab === 'deposits') { <td>{{item.depositId}}</td><td>{{item.customerId}}</td><td>{{item.branchId}}</td><td>{{item.depositType}}</td><td>{{item.amount | currency}}</td><td>{{item.interestRate}}%</td><td>{{item.openDate | date}}</td><td>{{item.maturityDate | date}}</td> }
+                  @if (activeDataTab === 'treasury') { <td>{{item.tradeId}}</td><td>{{item.instrument}}</td><td>{{item.counterparty}}</td><td>{{item.notional | currency}}</td><td>{{item.currency}}</td><td>{{item.tradeDate | date}}</td><td>{{item.maturityDate | date}}</td> }
+                  @if (activeDataTab === 'gl') { <td>{{item.glId}}</td><td>{{item.accountNumber}}</td><td>{{item.branchId}}</td><td>{{item.accountType}}</td><td>{{item.debit | currency}}</td><td>{{item.credit | currency}}</td><td>{{item.currency}}</td><td>{{item.transactionDate | date}}</td> }
+                  @if (activeDataTab === 'raw') { <td>{{item.rawRecordId}}</td><td>{{item.batch?.batchId}}</td><td class="formula-cell">{{item.payloadJson | slice:0:100}}...</td><td>{{item.recordDate | date}}</td> }
+                </tr>
+              }
+              @if (paginatedData.length === 0 && !isLoadingData) {
+                <tr><td colspan="8" class="empty-state"><span class="material-icons">storage</span><p>No data found.</p></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (totalPages > 1) {
+          <div class="pagination-footer">
+            <span class="page-info">Page {{currentPage}} of {{totalPages}} · {{ totalItemCount }} records</span>
+            <div class="page-controls">
+              <button class="action-btn outline small" (click)="prevPage()" [disabled]="currentPage === 1"><span class="material-icons">chevron_left</span> Prev</button>
+              <button class="action-btn outline small" (click)="nextPage()" [disabled]="currentPage === totalPages">Next <span class="material-icons">chevron_right</span></button>
+            </div>
+          </div>
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
         }
       </div>
     }
@@ -360,8 +478,13 @@
             <input type="text" class="audit-search-input" placeholder="Search actions, users..."
               [(ngModel)]="auditSearchTerm" (ngModelChange)="onAuditSearch()" />
           </div>
+<<<<<<< HEAD
           <button class="action-btn outline" (click)="loadAuditLogs()" [disabled]="isLoadingAudit">
             <span class="material-icons">refresh</span> {{ isLoadingAudit ? 'Loading...' : 'Refresh' }}
+=======
+          <button class="action-btn outline" (click)="loadAuditLogs()">
+            <span class="material-icons" [class.rotating]="isLoadingAudit">refresh</span> Refresh
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
           </button>
         </div>
       </div>
@@ -417,6 +540,7 @@
         </div>
         @if (filteredAuditLogs.length > 0) {
           <div class="pagination-footer">
+<<<<<<< HEAD
             <span class="page-info">Page {{ auditPage }} of {{ auditTotalPages }} &middot; {{ filteredAuditLogs.length }} records</span>
             <div class="page-controls">
               <button class="action-btn outline small" (click)="auditPrev()" [disabled]="auditPage === 1">
@@ -425,11 +549,20 @@
               <button class="action-btn outline small" (click)="auditNext()" [disabled]="auditPage === auditTotalPages">
                 Next <span class="material-icons">chevron_right</span>
               </button>
+=======
+            <span class="page-info">Page {{ auditPage }} of {{ auditTotalPages }} · {{ filteredAuditLogs.length }} records</span>
+            <div class="page-controls">
+              <button class="action-btn outline small" (click)="auditPrev()" [disabled]="auditPage === 1"><span class="material-icons">chevron_left</span> Prev</button>
+              <button class="action-btn outline small" (click)="auditNext()" [disabled]="auditPage === auditTotalPages">Next <span class="material-icons">chevron_right</span></button>
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
             </div>
           </div>
         }
       </div>
     }
   </main>
+<<<<<<< HEAD
 
+=======
+>>>>>>> cbc6641281ccab5efc8889dd07c4810f4a9fd278
 </div>
