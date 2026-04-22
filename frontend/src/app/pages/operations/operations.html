@@ -73,20 +73,36 @@
       </div>
       <div class="stats-grid">
         <div class="stat-card blue">
-          <div class="stat-icon"><span class="material-icons">inventory_2</span></div>
-          <div class="stat-content"><h3>Total Batches</h3><div class="stat-value">{{ totalBatches }}</div></div>
+          <div class="stat-icon"><span class="material-icons">account_balance</span></div>
+          <div class="stat-content">
+            <h3>Total Loans</h3>
+            <div class="stat-value">{{ totalLoans }}</div>
+            <div class="stat-sub">Loan records on file</div>
+          </div>
         </div>
         <div class="stat-card green">
-          <div class="stat-icon"><span class="material-icons">check_circle</span></div>
-          <div class="stat-content"><h3>Completed</h3><div class="stat-value">{{ completedBatches }}</div></div>
+          <div class="stat-icon"><span class="material-icons">savings</span></div>
+          <div class="stat-content">
+            <h3>Total Deposits</h3>
+            <div class="stat-value">{{ totalDeposits }}</div>
+            <div class="stat-sub">Deposit records on file</div>
+          </div>
         </div>
         <div class="stat-card orange">
-          <div class="stat-icon"><span class="material-icons">dataset</span></div>
-          <div class="stat-content"><h3>Total Records</h3><div class="stat-value">{{ totalRecords }}</div></div>
+          <div class="stat-icon"><span class="material-icons">trending_up</span></div>
+          <div class="stat-content">
+            <h3>Treasury Trades</h3>
+            <div class="stat-value">{{ totalTreasury }}</div>
+            <div class="stat-sub">Treasury trade records</div>
+          </div>
         </div>
         <div class="stat-card purple">
-          <div class="stat-icon"><span class="material-icons">source</span></div>
-          <div class="stat-content"><h3>Data Sources</h3><div class="stat-value">4</div></div>
+          <div class="stat-icon"><span class="material-icons">receipt_long</span></div>
+          <div class="stat-content">
+            <h3>GL Entries</h3>
+            <div class="stat-value">{{ totalGl }}</div>
+            <div class="stat-sub">General ledger entries</div>
+          </div>
         </div>
       </div>
       <div class="charts-grid">
@@ -200,6 +216,25 @@
         </div>
       </div>
 
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="stat-icon"><span class="material-icons">inventory_2</span></div>
+          <div class="stat-content"><h3>Total Batches</h3><div class="stat-value">{{ totalBatches }}</div></div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon"><span class="material-icons">check_circle</span></div>
+          <div class="stat-content"><h3>Completed</h3><div class="stat-value">{{ completedBatches }}</div></div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-icon"><span class="material-icons">dataset</span></div>
+          <div class="stat-content"><h3>Total Records</h3><div class="stat-value">{{ totalRecords }}</div></div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon"><span class="material-icons">source</span></div>
+          <div class="stat-content"><h3>Data Sources</h3><div class="stat-value">4</div></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="table-container">
           <table>
@@ -213,10 +248,18 @@
                   <td>{{ batch.rowCount }}</td>
                   <td><span class="status-badge" [class]="getStatusClass(batch.status)">{{ batch.status }}</span></td>
                   <td>
-                    <button class="action-btn primary small"
+                    <button class="action-btn small"
+                            [class.success]="isBatchConverted(batch)"
+                            [class.primary]="!isBatchConverted(batch)"
                             (click)="loadRawRecordsForConversion(batch.batchId)"
-                            [disabled]="isConvertingRawRecords">
-                      {{ convertingBatchId === batch.batchId ? 'Converting...' : 'Convert' }}
+                            [disabled]="isBatchConverted(batch) || isConvertingRawRecords">
+                      @if (isBatchConverted(batch)) {
+                        <span class="material-icons" style="font-size:15px">check_circle</span> Converted
+                      } @else if (convertingBatchId === batch.batchId) {
+                        Converting...
+                      } @else {
+                        Convert
+                      }
                     </button>
                   </td>
                 </tr>

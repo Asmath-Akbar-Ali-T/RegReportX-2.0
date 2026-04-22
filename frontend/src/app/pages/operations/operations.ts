@@ -51,6 +51,25 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   // Raw Records Conversion
   convertingBatchId: number | null = null;
   isConvertingRawRecords = false;
+  convertedBatchIds: Set<number> = new Set();
+
+  private readonly STORAGE_KEY = 'rrx_converted_batch_ids';
+
+  private loadConvertedIds(): void {
+    try {
+      const stored = localStorage.getItem(this.STORAGE_KEY);
+      if (stored) {
+        const ids: number[] = JSON.parse(stored);
+        this.convertedBatchIds = new Set(ids);
+      }
+    } catch { this.convertedBatchIds = new Set(); }
+  }
+
+  private saveConvertedIds(): void {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify([...this.convertedBatchIds]));
+    } catch { /* storage unavailable */ }
+  }
 
   // Ingestion & Uploads - Fully initialized to prevent undefined errors
   ingestionBatches: RawDataBatch[] = [];
@@ -116,6 +135,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.username = this.authService.getUsername() || 'Officer';
+    this.loadConvertedIds();
     this.loadDashboardData();
   }
 
@@ -175,8 +195,13 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
         this.run(() => {
           this.ingestionBatches = data;
           this.totalBatches = data.length;
-          this.completedBatches = data.filter(b => b.status === 'COMPLETED').length;
           this.totalRecords = data.reduce((sum, b) => sum + (b.rowCount || 0), 0);
+          data.filter(b => b.status === 'COMPLETED').forEach(b => this.convertedBatchIds.add(b.batchId));
+          this.saveConvertedIds();
+          // Count as completed: batches marked COMPLETED by backend OR locally converted this session
+          this.completedBatches = data.filter(b =>
+            b.status === 'COMPLETED' || this.convertedBatchIds.has(b.batchId)
+          ).length;
           setTimeout(() => this.renderBatchStatusChart());
         });
       },
@@ -281,6 +306,9 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     ).subscribe({
       next: () => {
         this.run(() => {
+          this.convertedBatchIds.add(batchId);
+          this.saveConvertedIds();
+          this.completedBatches++;
           this.uploadModal = {
             visible: true,
             success: true,
@@ -448,6 +476,19 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (action.includes('FILED')) return 'upload_file';
     if (action.includes('WORKFLOW')) return 'swap_horiz';
     return 'info';
+  }
+
+  // --- Computed Dashboard Stats ---
+  get totalSourceRecords(): number {
+    return this.totalLoans + this.totalDeposits + this.totalTreasury + this.totalGl;
+  }
+
+  get pendingBatches(): number {
+    return this.totalBatches - this.completedBatches;
+  }
+
+  isBatchConverted(batch: { batchId: number; status: string }): boolean {
+    return batch.status === 'COMPLETED' || this.convertedBatchIds.has(batch.batchId);
   }
 
   // --- Helper Methods ---
