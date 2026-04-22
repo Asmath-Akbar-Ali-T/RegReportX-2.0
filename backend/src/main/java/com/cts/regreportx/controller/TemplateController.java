@@ -30,6 +30,7 @@ public class TemplateController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('REGTECH_ADMIN','REPORTING_OFFICER','COMPLIANCE_ANALYST','RISK_ANALYST')")
     public ResponseEntity<List<RegTemplateDTO>> getAllTemplates() {
         return ResponseEntity.ok(templateService.getAllTemplates().stream()
                 .map(t -> modelMapper.map(t, RegTemplateDTO.class))
@@ -37,6 +38,7 @@ public class TemplateController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('REGTECH_ADMIN','REPORTING_OFFICER','COMPLIANCE_ANALYST','RISK_ANALYST')")
     public ResponseEntity<RegTemplateDTO> getTemplateById(@PathVariable Integer id) {
         return templateService.getTemplateById(id)
                 .map(t -> ResponseEntity.ok(modelMapper.map(t, RegTemplateDTO.class)))

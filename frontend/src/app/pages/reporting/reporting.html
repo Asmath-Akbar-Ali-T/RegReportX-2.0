@@ -177,17 +177,24 @@
           <div class="ro-card-body">
             <div class="ro-form-group">
               <label class="ro-label" for="gen-template-id">
-                <span class="material-icons">description</span> Template ID
+                <span class="material-icons">description</span> Template
               </label>
-              <input
-                id="gen-template-id"
-                type="number"
-                min="1"
-                class="ro-input"
-                [(ngModel)]="generateTemplateId"
-                placeholder="e.g. 1"
-              />
-              <span class="ro-help-text">Enter the numeric ID of the regulatory template to use</span>
+              <div class="ro-select-wrapper">
+                <select
+                  id="gen-template-id"
+                  class="ro-input ro-select"
+                  [(ngModel)]="generateTemplateId"
+                  [disabled]="loadingTemplates"
+                >
+                  <option *ngIf="loadingTemplates" [value]="0">Loading templates…</option>
+                  <option *ngIf="!loadingTemplates && templates.length === 0" [value]="0">No templates available</option>
+                  <option *ngFor="let t of templates" [value]="t.templateId">
+                    {{ t.templateId }} — {{ t.regulationCode }}
+                  </option>
+                </select>
+                <span class="ro-select-icon material-icons">expand_more</span>
+              </div>
+              <span class="ro-help-text">Select the regulatory template to use for this report</span>
             </div>
 
             <div class="ro-form-group">
@@ -302,7 +309,7 @@
         <p>Loading reports…</p>
       </div>
 
-      <!-- Reports Table -->
+      <!-- Reports Table (detailed view with filters) -->
       <div class="ro-table-card" *ngIf="!loadingReports">
         <table class="ro-table" *ngIf="filteredReports.length > 0">
           <thead>

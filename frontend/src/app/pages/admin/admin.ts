@@ -1,4 +1,4 @@
-import { Component, OnInit, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -10,6 +10,7 @@ import { RegTemplate, TemplateField } from '../../models/template.model';
 import { RegReport } from '../../models/report.model';
 import { User } from '../../models/user.model';
 import { Chart, registerables } from 'chart.js';
+import { finalize } from 'rxjs';
 
 Chart.register(...registerables);
 
@@ -24,6 +25,11 @@ export class AdminComponent implements OnInit, AfterViewInit {
   @ViewChild('templateChart') templateChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('fieldsChart') fieldsChartRef!: ElementRef<HTMLCanvasElement>;
 
+  // Loading / submitting flags (double-click prevention)
+  isSubmitting = false;
+  isLoadingReports = false;
+  approvingReportId: number | null = null;
+
   activeTab: 'templates' | 'fields' | 'reports' | 'users' | 'charts' = 'templates';
   username: string | null = '';
 
@@ -35,14 +41,50 @@ export class AdminComponent implements OnInit, AfterViewInit {
 
   // Fields
   selectedTemplateId: number | null = null;
+  isAllFieldsMode = false;
   fields: TemplateField[] = [];
   showFieldModal = false;
   editingField: TemplateField | null = null;
   fieldForm: TemplateField = { fieldName: '', dataType: '', mappingExpression: '', requiredFlag: false };
+  fieldTargetTemplateId: number | null = null;   // used when adding a field while in ALL mode
 
   // Reports
-  reportIdInput = '';
+  filterTemplate = '';
+  filterStatus = '';
+  filterWorkflow = '';   // '' | 'PENDING' | 'COMPLETED'
   reports: RegReport[] = [];
+
+  // Report pagination
+  reportPage = 1;
+  readonly reportPageSize = 10;
+
+  get filteredReports(): RegReport[] {
+    let result = this.reports;
+    if (this.filterTemplate) result = result.filter(r => r.template?.regulationCode === this.filterTemplate);
+    if (this.filterStatus) result = result.filter(r => r.status === this.filterStatus);
+    if (this.filterWorkflow === 'PENDING')
+      result = result.filter(r => r.status !== 'APPROVED' && r.status !== 'FILED');
+    if (this.filterWorkflow === 'COMPLETED')
+      result = result.filter(r => r.status === 'APPROVED' || r.status === 'FILED');
+    return result;
+  }
+
+  get paginatedReports(): RegReport[] {
+    const start = (this.reportPage - 1) * this.reportPageSize;
+    return this.filteredReports.slice(start, start + this.reportPageSize);
+  }
+
+  get reportTotalPages(): number {
+    return Math.ceil(this.filteredReports.length / this.reportPageSize) || 1;
+  }
+
+  reportPrevPage(): void {
+    if (this.reportPage > 1) { this.reportPage--; this.cdr.detectChanges(); }
+  }
+
+  reportNextPage(): void {
+    if (this.reportPage < this.reportTotalPages) { this.reportPage++; this.cdr.detectChanges(); }
+  }
 
   // Users
   users: User[] = [];
@@ -63,8 +105,22 @@ export class AdminComponent implements OnInit, AfterViewInit {
     private templateService: TemplateService,
     private reportService: ReportService,
     private userService: UserService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {}
+
+  /**
+   * Runs a callback inside Angular's zone and triggers change detection.
+   * Prevents the double-click / stale-view glitch from HTTP callbacks
+   * running outside Angular's zone (same pattern as OperationsComponent).
+   */
+  private run(fn: () => void): void {
+    this.ngZone.run(() => {
+      fn();
+      this.cdr.detectChanges();
+    });
+  }
 
   ngOnInit(): void {
     this.username = this.authService.getUsername();
@@ -80,6 +136,12 @@ export class AdminComponent implements OnInit, AfterViewInit {
   // --- Tab Management ---
   switchTab(tab: 'templates' | 'fields' | 'reports' | 'users' | 'charts'): void {
     this.activeTab = tab;
+    if (tab === 'fields') {
+      this.selectAllFields();
+    }
+    if (tab === 'reports') {
+      this.loadAllReports();
+    }
     if (tab === 'users' && this.users.length === 0) {
       this.loadUsers();
     }
@@ -97,8 +159,8 @@ export class AdminComponent implements OnInit, AfterViewInit {
   // --- Template Management ---
   loadTemplates(): void {
     this.templateService.getAllTemplates().subscribe({
-      next: (data) => this.templates = data,
-      error: () => this.showNotification('Failed to load templates', 'error')
+      next: (data) => this.run(() => this.templates = data),
+      error: () => this.run(() => this.showNotification('Failed to load templates', 'error'))
     });
   }
 
@@ -117,26 +179,33 @@ export class AdminComponent implements OnInit, AfterViewInit {
   closeTemplateModal(): void {
     this.showTemplateModal = false;
     this.editingTemplate = null;
+    this.isSubmitting = false;
   }
 
   saveTemplate(): void {
+    if (this.isSubmitting) return;
+    this.isSubmitting = true;
     if (this.editingTemplate && this.editingTemplate.templateId) {
-      this.templateService.updateTemplate(this.editingTemplate.templateId, this.templateForm).subscribe({
-        next: () => {
+      this.templateService.updateTemplate(this.editingTemplate.templateId, this.templateForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
           this.loadTemplates();
           this.closeTemplateModal();
           this.showNotification('Template updated successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to update template', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to update template', 'error'))
       });
     } else {
-      this.templateService.createTemplate(this.templateForm).subscribe({
-        next: () => {
+      this.templateService.createTemplate(this.templateForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
           this.loadTemplates();
           this.closeTemplateModal();
           this.showNotification('Template created successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to create template', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to create template', 'error'))
       });
     }
   }
@@ -144,17 +213,40 @@ export class AdminComponent implements OnInit, AfterViewInit {
   deleteTemplate(id: number): void {
     if (confirm('Are you sure you want to delete this template?')) {
       this.templateService.deleteTemplate(id).subscribe({
-        next: () => {
+        next: () => this.run(() => {
           this.loadTemplates();
           this.showNotification('Template deleted successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to delete template', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to delete template', 'error'))
       });
     }
   }
 
   // --- Field Management ---
+  selectAllFields(): void {
+    this.isAllFieldsMode = true;
+    this.selectedTemplateId = null;
+    const validTemplates = this.templates.filter(t => !!t.templateId);
+    if (validTemplates.length === 0) { this.run(() => this.fields = []); return; }
+    const combined: TemplateField[] = [];
+    let remaining = validTemplates.length;
+    validTemplates.forEach(t => {
+      this.templateService.getFieldsByTemplateId(t.templateId!).subscribe({
+        next: (data) => this.run(() => {
+          data.forEach(f => combined.push({ ...f, template: f.template ?? t }));
+          remaining--;
+          if (remaining === 0) this.fields = [...combined].sort((a, b) => (a.fieldId ?? 0) - (b.fieldId ?? 0));
+        }),
+        error: () => this.run(() => {
+          remaining--;
+          if (remaining === 0) this.fields = [...combined].sort((a, b) => (a.fieldId ?? 0) - (b.fieldId ?? 0));
+        })
+      });
+    });
+  }
+
   selectTemplateForFields(templateId: number): void {
+    this.isAllFieldsMode = false;
     this.selectedTemplateId = templateId;
     this.loadFields();
   }
@@ -162,14 +254,15 @@ export class AdminComponent implements OnInit, AfterViewInit {
   loadFields(): void {
     if (!this.selectedTemplateId) return;
     this.templateService.getFieldsByTemplateId(this.selectedTemplateId).subscribe({
-      next: (data) => this.fields = data,
-      error: () => this.showNotification('Failed to load fields', 'error')
+      next: (data) => this.run(() => this.fields = data),
+      error: () => this.run(() => this.showNotification('Failed to load fields', 'error'))
     });
   }
 
   openAddField(): void {
     this.editingField = null;
     this.fieldForm = { fieldName: '', dataType: '', mappingExpression: '', requiredFlag: false };
+    this.fieldTargetTemplateId = null;
     this.showFieldModal = true;
   }
 
@@ -182,27 +275,35 @@ export class AdminComponent implements OnInit, AfterViewInit {
   closeFieldModal(): void {
     this.showFieldModal = false;
     this.editingField = null;
+    this.isSubmitting = false;
   }
 
   saveField(): void {
-    if (!this.selectedTemplateId) return;
+    // In ALL mode use the template chosen inside the modal; otherwise use the active chip
+    const targetId = this.selectedTemplateId ?? this.fieldTargetTemplateId;
+    if (!targetId || this.isSubmitting) return;
+    this.isSubmitting = true;
     if (this.editingField && this.editingField.fieldId) {
-      this.templateService.updateField(this.editingField.fieldId, this.fieldForm).subscribe({
-        next: () => {
-          this.loadFields();
+      this.templateService.updateField(this.editingField.fieldId, this.fieldForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
+          this.isAllFieldsMode ? this.selectAllFields() : this.loadFields();
           this.closeFieldModal();
           this.showNotification('Field updated successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to update field', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to update field', 'error'))
       });
     } else {
-      this.templateService.addFieldToTemplate(this.selectedTemplateId, this.fieldForm).subscribe({
-        next: () => {
-          this.loadFields();
+      this.templateService.addFieldToTemplate(targetId, this.fieldForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
+          this.isAllFieldsMode ? this.selectAllFields() : this.loadFields();
           this.closeFieldModal();
           this.showNotification('Field added successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to add field', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to add field', 'error'))
       });
     }
   }
@@ -210,56 +311,52 @@ export class AdminComponent implements OnInit, AfterViewInit {
   deleteField(fieldId: number): void {
     if (confirm('Are you sure you want to delete this field?')) {
       this.templateService.deleteField(fieldId).subscribe({
-        next: () => {
+        next: () => this.run(() => {
           this.loadFields();
           this.showNotification('Field deleted successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to delete field', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to delete field', 'error'))
       });
     }
   }
 
   // --- Report Approval ---
-  fetchReport(): void {
-    const id = parseInt(this.reportIdInput, 10);
-    if (isNaN(id)) {
-      this.showNotification('Please enter a valid report ID', 'error');
-      return;
-    }
-    this.reportService.getReport(id).subscribe({
-      next: (report) => {
-        const exists = this.reports.find(r => r.reportId === report.reportId);
-        if (!exists) {
-          this.reports.push(report);
-        } else {
-          const idx = this.reports.findIndex(r => r.reportId === report.reportId);
-          this.reports[idx] = report;
-        }
-        this.reportIdInput = '';
-      },
-      error: () => this.showNotification('Report not found', 'error')
+  loadAllReports(): void {
+    if (this.isLoadingReports) return;
+    this.isLoadingReports = true;
+    this.reportPage = 1;
+    this.filterWorkflow = '';
+    this.reportService.getReports().pipe(
+      finalize(() => this.run(() => this.isLoadingReports = false))
+    ).subscribe({
+      next: (data) => this.run(() => this.reports = data),
+      error: () => this.run(() => this.showNotification('Failed to load reports', 'error'))
     });
   }
 
   approveReport(id: number): void {
-    this.reportService.approveReport(id, 1).subscribe({
-      next: (updated) => {
+    if (this.approvingReportId !== null) return;
+    this.approvingReportId = id;
+    this.reportService.approveReport(id, 1).pipe(
+      finalize(() => this.run(() => this.approvingReportId = null))
+    ).subscribe({
+      next: (updated) => this.run(() => {
         const idx = this.reports.findIndex(r => r.reportId === id);
         if (idx !== -1) this.reports[idx] = updated;
         this.showNotification('Report approved successfully', 'success');
-      },
-      error: (err) => {
+      }),
+      error: (err) => this.run(() => {
         const msg = err.error?.message || err.error || 'Failed to approve report';
         this.showNotification(typeof msg === 'string' ? msg : 'Failed to approve report', 'error');
-      }
+      })
     });
   }
 
   // --- User Management ---
   loadUsers(): void {
     this.userService.getAllUsers().subscribe({
-      next: (data) => this.users = data,
-      error: () => this.showNotification('Failed to load users', 'error')
+      next: (data) => this.run(() => this.users = data),
+      error: () => this.run(() => this.showNotification('Failed to load users', 'error'))
     });
   }
 
@@ -278,26 +375,33 @@ export class AdminComponent implements OnInit, AfterViewInit {
   closeUserModal(): void {
     this.showUserModal = false;
     this.editingUser = null;
+    this.isSubmitting = false;
   }
 
   saveUser(): void {
+    if (this.isSubmitting) return;
+    this.isSubmitting = true;
     if (this.editingUser && this.editingUser.id) {
-      this.userService.updateUser(this.editingUser.id, this.userForm).subscribe({
-        next: () => {
+      this.userService.updateUser(this.editingUser.id, this.userForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
           this.loadUsers();
           this.closeUserModal();
           this.showNotification('User updated successfully', 'success');
-        },
-        error: (err) => this.showNotification(err.error?.message || err.error || 'Failed to update user', 'error')
+        }),
+        error: (err) => this.run(() => this.showNotification(err.error?.message || err.error || 'Failed to update user', 'error'))
       });
     } else {
-      this.userService.createUser(this.userForm).subscribe({
-        next: () => {
+      this.userService.createUser(this.userForm).pipe(
+        finalize(() => this.run(() => this.isSubmitting = false))
+      ).subscribe({
+        next: () => this.run(() => {
           this.loadUsers();
           this.closeUserModal();
           this.showNotification('User created successfully', 'success');
-        },
-        error: (err) => this.showNotification(err.error?.message || err.error || 'Failed to create user', 'error')
+        }),
+        error: (err) => this.run(() => this.showNotification(err.error?.message || err.error || 'Failed to create user', 'error'))
       });
     }
   }
@@ -305,33 +409,39 @@ export class AdminComponent implements OnInit, AfterViewInit {
   deleteUser(id: number): void {
     if (confirm('Are you sure you want to delete this user?')) {
       this.userService.deleteUser(id).subscribe({
-        next: () => {
+        next: () => this.run(() => {
           this.loadUsers();
           this.showNotification('User deleted successfully', 'success');
-        },
-        error: () => this.showNotification('Failed to delete user', 'error')
+        }),
+        error: () => this.run(() => this.showNotification('Failed to delete user', 'error'))
       });
     }
   }
 
   toggleUserStatus(id: number): void {
+    const user = this.users.find(u => u.id === id);
+    if (user?.role === 'REGTECH_ADMIN') {
+      this.showNotification("Can't disable the Admin", 'error');
+      return;
+    }
     this.userService.toggleUserStatus(id).subscribe({
-      next: () => {
+      next: () => this.run(() => {
         this.loadUsers();
         this.showNotification('User status toggled', 'success');
-      },
-      error: () => this.showNotification('Failed to update user status', 'error')
+      }),
+      error: () => this.run(() => this.showNotification('Failed to update user status', 'error'))
     });
   }
 
   // --- Charts ---
   initCharts(): void {
     this.templateService.getAllTemplates().subscribe({
-      next: (templates) => {
+      next: (templates) => this.run(() => {
         this.buildTemplateChart(templates);
         this.loadFieldsForCharts(templates);
         this.chartsInitialized = true;
-      }
+      }),
+      error: () => this.run(() => this.showNotification('Failed to load chart data', 'error'))
     });
   }
 
@@ -400,16 +510,16 @@ export class AdminComponent implements OnInit, AfterViewInit {
     templates.forEach(t => {
       if (!t.templateId) { loaded++; return; }
       this.templateService.getFieldsByTemplateId(t.templateId).subscribe({
-        next: (fields) => {
+        next: (fields) => this.run(() => {
           chartData.push({ label: t.regulationCode || `Template ${t.templateId}`, count: fields.length });
           loaded++;
           if (loaded === templates.length) this.buildFieldsChart(chartData);
-        },
-        error: () => {
+        }),
+        error: () => this.run(() => {
           chartData.push({ label: t.regulationCode || `Template ${t.templateId}`, count: 0 });
           loaded++;
           if (loaded === templates.length) this.buildFieldsChart(chartData);
-        }
+        })
       });
     });
   }
@@ -479,6 +589,7 @@ export class AdminComponent implements OnInit, AfterViewInit {
       case 'DRAFT': case 'GENERATED': return 'status-info';
       case 'PENDING': case 'SUBMITTED': return 'status-warning';
       case 'INACTIVE': case 'REJECTED': return 'status-danger';
+      case 'UNDER_REVIEW': return 'status-review';
       default: return 'status-default';
     }
   }

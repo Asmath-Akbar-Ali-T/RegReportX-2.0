@@ -287,6 +287,7 @@ tbody tr:hover { background: var(--primary-50); }
 .status-info { background: #e0f0ff; color: #0c6fc7; }
 .status-warning { background: #fff4e6; color: #c77d0a; }
 .status-danger { background: #fde8ea; color: #c42836; }
+.status-review { background: #f3e8fd; color: #7c3aed; }
 .status-default { background: var(--bg); color: var(--text-secondary); }
 
 .type-badge {
@@ -404,6 +405,20 @@ tbody tr:hover { background: var(--primary-50); }
 }
 .chart-card h3 .material-icons { font-size: 20px; color: var(--primary); }
 .chart-wrapper { height: 300px; position: relative; }
+
+/* ============ Pagination ============ */
+.pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--border);
+  background: #fafbfe;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.page-info { font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
+.page-controls { display: flex; gap: 0.5rem; align-items: center; }
 
 /* ============ Toast ============ */
 .toast {

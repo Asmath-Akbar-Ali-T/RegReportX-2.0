@@ -1,11 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ReportService } from '../../services/report.service';
 import { AuditService } from '../../services/audit.service';
+import { TemplateService } from '../../services/template.service';
 import { RegReport } from '../../models/report.model';
+import { RegTemplate } from '../../models/template.model';
 import { AuditLog } from '../../models/audit-log.model';
 import { finalize } from 'rxjs/operators';
 
@@ -35,8 +37,12 @@ export class ReportingComponent implements OnInit {
   searchQuery = '';
   statusFilter = 'ALL';
 
+  // Templates for dropdown
+  templates: RegTemplate[] = [];
+  loadingTemplates = false;
+
   // Generate form
-  generateTemplateId = 1;
+  generateTemplateId = 0;
   generatePeriod = '2026-Q1';
   generating = false;
   lastGenerated: RegReport | null = null;
@@ -65,7 +71,7 @@ export class ReportingComponent implements OnInit {
   auditPageSize = 10;
   isLoadingAudit = false;
 
-  readonly STATUS_OPTIONS = ['ALL', 'GENERATED', 'SUBMITTED', 'APPROVED', 'FILED', 'REJECTED'];
+  readonly STATUS_OPTIONS = ['ALL', 'DRAFT', 'UNDER REVIEW', 'APPROVED', 'FILED'];
   readonly PERIODS = [
     '2026-Q1', '2026-Q2', '2026-Q3', '2026-Q4',
     '2025-Q1', '2025-Q2', '2025-Q3', '2025-Q4',
@@ -75,13 +81,29 @@ export class ReportingComponent implements OnInit {
     public authService: AuthService,
     private router: Router,
     private reportService: ReportService,
-    private auditService: AuditService
+    private auditService: AuditService,
+    private templateService: TemplateService,
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.username = this.authService.getUsername() || 'Officer';
   }
 
+  /**
+   * Runs a function inside Angular's zone and immediately triggers
+   * change detection. This fixes the 'must click multiple times to see results'
+   * glitch caused by HTTP callbacks running outside Angular's zone.
+   */
+  private run(fn: () => void): void {
+    this.ngZone.run(() => {
+      fn();
+      this.cdr.detectChanges();
+    });
+  }
+
   ngOnInit(): void {
     this.loadReports();
+    this.loadTemplates();
   }
 
   // Navigation
@@ -93,6 +115,9 @@ export class ReportingComponent implements OnInit {
     if (view === 'audit') {
       this.loadAuditLogs();
     }
+    if (view === 'generate' && this.templates.length === 0) {
+      this.loadTemplates();
+    }
   }
 
   logout(): void {
@@ -100,19 +125,39 @@ export class ReportingComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
+  // Load templates from API for dropdown
+  loadTemplates(): void {
+    this.loadingTemplates = true;
+    this.templateService.getAllTemplates().pipe(
+      finalize(() => this.run(() => this.loadingTemplates = false))
+    ).subscribe({
+      next: (templates) => this.run(() => {
+        this.templates = templates;
+        if (templates.length > 0 && templates[0].templateId) {
+          this.generateTemplateId = templates[0].templateId;
+        }
+      }),
+      error: () => this.run(() => this.toast('error', 'Failed to load templates'))
+    });
+  }
+
   // Load reports
   loadReports(): void {
     this.loadingReports = true;
     this.reportService.getReports().subscribe({
       next: (reports) => {
-        this.reports = reports;
-        this.computeStats(reports);
-        this.applyFilters();
-        this.loadingReports = false;
+        this.run(() => {
+          this.reports = reports;
+          this.computeStats(reports);
+          this.applyFilters();
+          this.loadingReports = false;
+        });
       },
       error: (err) => {
-        this.toast('error', 'Failed to load reports: ' + (err.error || err.message));
-        this.loadingReports = false;
+        this.run(() => {
+          this.toast('error', 'Failed to load reports: ' + (err.error || err.message));
+          this.loadingReports = false;
+        });
       }
     });
   }
@@ -124,10 +169,19 @@ export class ReportingComponent implements OnInit {
     this.stats.filed = reports.filter(r => r.status === 'FILED').length;
   }
 
+  // Maps the friendly filter chip label to the actual backend status values
+  private readonly FILTER_STATUS_MAP: Record<string, string[]> = {
+    'DRAFT':        ['GENERATED', 'DRAFT'],
+    'UNDER REVIEW': ['SUBMITTED', 'UNDER_REVIEW'],
+    'APPROVED':     ['APPROVED'],
+    'FILED':        ['FILED']
+  };
+
   applyFilters(): void {
     let filtered = [...this.reports];
     if (this.statusFilter !== 'ALL') {
-      filtered = filtered.filter(r => r.status === this.statusFilter);
+      const statuses = this.FILTER_STATUS_MAP[this.statusFilter] ?? [this.statusFilter];
+      filtered = filtered.filter(r => statuses.includes(r.status));
     }
     if (this.searchQuery.trim()) {
       const q = this.searchQuery.toLowerCase();
@@ -149,14 +203,18 @@ export class ReportingComponent implements OnInit {
     this.lastGenerated = null;
     this.reportService.generateReport(this.generateTemplateId, this.generatePeriod).subscribe({
       next: (report) => {
-        this.lastGenerated = report;
-        this.generating = false;
-        this.toast('success', `Report generated successfully for period ${report.period}`);
-        this.loadReports();
+        this.run(() => {
+          this.lastGenerated = report;
+          this.generating = false;
+          this.toast('success', `Report generated successfully for period ${report.period}`);
+          this.loadReports();
+        });
       },
       error: (err) => {
-        this.generating = false;
-        this.toast('error', 'Failed to generate report: ' + (err.error || err.message));
+        this.run(() => {
+          this.generating = false;
+          this.toast('error', 'Failed to generate report: ' + (err.error || err.message));
+        });
       }
     });
   }
@@ -178,14 +236,18 @@ export class ReportingComponent implements OnInit {
     if (!report.reportId) return;
     this.filingMap[report.reportId] = true;
     this.reportService.fileReport(report.reportId).subscribe({
-      next: (updated) => {
-        this.filingMap[report.reportId!] = false;
-        this.toast('success', `Report #${report.reportId} filed successfully!`);
-        this.loadReports();
+      next: () => {
+        this.run(() => {
+          this.filingMap[report.reportId!] = false;
+          this.toast('success', `Report #${report.reportId} filed successfully!`);
+          this.loadReports();
+        });
       },
       error: (err) => {
-        this.filingMap[report.reportId!] = false;
-        this.toast('error', 'Failed to file report: ' + (err.error || err.message));
+        this.run(() => {
+          this.filingMap[report.reportId!] = false;
+          this.toast('error', 'Failed to file report: ' + (err.error || err.message));
+        });
       }
     });
   }
@@ -198,13 +260,15 @@ export class ReportingComponent implements OnInit {
   loadAuditLogs(): void {
     this.isLoadingAudit = true;
     this.auditService.getAuditLogs().pipe(
-      finalize(() => this.isLoadingAudit = false)
+      finalize(() => this.run(() => this.isLoadingAudit = false))
     ).subscribe({
       next: data => {
-        this.auditLogs = data;
-        this.auditPage = 1;
+        this.run(() => {
+          this.auditLogs = data;
+          this.auditPage = 1;
+        });
       },
-      error: () => this.toast('error', 'Failed to load audit logs')
+      error: () => this.run(() => this.toast('error', 'Failed to load audit logs'))
     });
   }
 
@@ -308,8 +372,21 @@ export class ReportingComponent implements OnInit {
     });
   }
 
+  // Status section getters for All Reports kanban view
+  get draftReports(): RegReport[] {
+    return this.reports.filter(r => r.status === 'GENERATED' || r.status === 'DRAFT');
+  }
+
+  get underReviewReports(): RegReport[] {
+    return this.reports.filter(r => r.status === 'SUBMITTED' || r.status === 'UNDER_REVIEW');
+  }
+
   get approvedReports(): RegReport[] {
     return this.reports.filter(r => r.status === 'APPROVED');
+  }
+
+  get filedReports(): RegReport[] {
+    return this.reports.filter(r => r.status === 'FILED');
   }
 
   // Toast

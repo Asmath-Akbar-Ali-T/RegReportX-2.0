@@ -127,7 +127,7 @@
           <h1>Template Field Management</h1>
           <p>Manage fields and formulas for templates</p>
         </div>
-        @if (selectedTemplateId) {
+        @if (selectedTemplateId || isAllFieldsMode) {
           <button class="action-btn primary" (click)="openAddField()" id="add-field-btn">
             <span class="material-icons">add</span>
             Add Field
@@ -139,6 +139,15 @@
       <div class="card selector-card">
         <h3><span class="material-icons">list_alt</span> Select Template</h3>
         <div class="template-chips">
+          <!-- ALL chip -->
+          <button
+            class="chip"
+            [class.chip-active]="isAllFieldsMode"
+            (click)="selectAllFields()"
+            id="chip-all"
+          >
+            ALL
+          </button>
           @for (t of templates; track t.templateId) {
             <button
               class="chip"
@@ -154,13 +163,14 @@
         </div>
       </div>
 
-      @if (selectedTemplateId) {
+      @if (isAllFieldsMode || selectedTemplateId) {
         <div class="card">
           <div class="table-container">
             <table id="fields-table">
               <thead>
                 <tr>
                   <th>Field ID</th>
+                  @if (isAllFieldsMode) { <th>Template</th> }
                   <th>Field Name</th>
                   <th>Data Type</th>
                   <th>Mapping Expression / Formula</th>
@@ -172,6 +182,9 @@
                 @for (f of fields; track f.fieldId) {
                   <tr>
                     <td><span class="id-badge">{{ f.fieldId }}</span></td>
+                    @if (isAllFieldsMode) {
+                      <td><span class="type-badge">{{ f.template?.regulationCode || 'N/A' }}</span></td>
+                    }
                     <td class="code-cell">{{ f.fieldName }}</td>
                     <td><span class="type-badge">{{ f.dataType }}</span></td>
                     <td class="formula-cell">{{ f.mappingExpression }}</td>
@@ -194,9 +207,9 @@
                 }
                 @empty {
                   <tr>
-                    <td colspan="6" class="empty-state">
+                    <td [attr.colspan]="isAllFieldsMode ? 7 : 6" class="empty-state">
                       <span class="material-icons">view_column</span>
-                      <p>No fields for this template</p>
+                      <p>No fields found</p>
                     </td>
                   </tr>
                 }
@@ -214,22 +227,33 @@
           <h1>Report Approval</h1>
           <p>Review and approve regulatory reports</p>
         </div>
+        <button class="action-btn outline" (click)="loadAllReports()" [disabled]="isLoadingReports" id="refresh-reports-btn">
+          <span class="material-icons">refresh</span>
+          {{ isLoadingReports ? 'Loading...' : 'Refresh' }}
+        </button>
       </div>
 
       <div class="card selector-card">
-        <h3><span class="material-icons">search</span> Fetch Report</h3>
+        <h3><span class="material-icons">filter_list</span> Filter Reports</h3>
         <div class="fetch-row">
-          <input
-            type="text"
-            [(ngModel)]="reportIdInput"
-            placeholder="Enter Report ID"
-            class="inline-input"
-            id="report-id-input"
-          />
-          <button class="action-btn primary" (click)="fetchReport()" id="fetch-report-btn">
-            <span class="material-icons">download</span>
-            Fetch
-          </button>
+          <select [(ngModel)]="filterTemplate" (ngModelChange)="reportPage = 1" class="inline-input" id="filter-template">
+            <option value="">All Templates</option>
+            @for (t of templates; track t.templateId) {
+              <option [value]="t.regulationCode">{{ t.regulationCode }}</option>
+            }
+          </select>
+          <select [(ngModel)]="filterStatus" (ngModelChange)="reportPage = 1" class="inline-input" id="filter-status">
+            <option value="">All Statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="APPROVED">Approved</option>
+            <option value="UNDER_REVIEW">Under Review</option>
+            <option value="FILED">Filed</option>
+          </select>
+          <select [(ngModel)]="filterWorkflow" (ngModelChange)="reportPage = 1" class="inline-input" id="filter-workflow">
+            <option value="">Approval Action</option>
+            <option value="PENDING">Pending</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
         </div>
       </div>
 
@@ -247,37 +271,61 @@
               </tr>
             </thead>
             <tbody>
-              @for (r of reports; track r.reportId) {
-                <tr>
-                  <td><span class="id-badge">{{ r.reportId }}</span></td>
-                  <td>{{ r.template?.regulationCode || 'N/A' }}</td>
-                  <td>{{ r.period }}</td>
-                  <td>{{ r.generatedDate | date:'medium' }}</td>
-                  <td><span class="status-badge" [class]="getStatusClass(r.status)">{{ r.status }}</span></td>
-                  <td>
-                    <button
-                      class="action-btn success small"
-                      (click)="approveReport(r.reportId!)"
-                      [disabled]="r.status === 'APPROVED' || r.status === 'FILED'"
-                      id="approve-btn-{{r.reportId}}"
-                    >
-                      <span class="material-icons">check_circle</span>
-                      Approve
-                    </button>
-                  </td>
-                </tr>
-              }
-              @empty {
+              @if (isLoadingReports) {
                 <tr>
                   <td colspan="6" class="empty-state">
-                    <span class="material-icons">fact_check</span>
-                    <p>No reports loaded. Fetch a report by ID.</p>
+                    <span class="material-icons">hourglass_top</span>
+                    <p>Loading reports...</p>
                   </td>
                 </tr>
+              } @else {
+                @for (r of paginatedReports; track r.reportId) {
+                  <tr>
+                    <td><span class="id-badge">{{ r.reportId }}</span></td>
+                    <td>{{ r.template?.regulationCode || 'N/A' }}</td>
+                    <td>{{ r.period }}</td>
+                    <td>{{ r.generatedDate | date:'medium' }}</td>
+                    <td><span class="status-badge" [class]="getStatusClass(r.status)">{{ r.status }}</span></td>
+                    <td>
+                      <button
+                        class="action-btn success small"
+                        (click)="approveReport(r.reportId!)"
+                        [disabled]="r.status === 'APPROVED' || r.status === 'FILED' || approvingReportId === r.reportId"
+                        id="approve-btn-{{r.reportId}}"
+                      >
+                        <span class="material-icons">check_circle</span>
+                        {{ approvingReportId === r.reportId ? 'Approving...' : 'Approve' }}
+                      </button>
+                    </td>
+                  </tr>
+                }
+                @empty {
+                  <tr>
+                    <td colspan="6" class="empty-state">
+                      <span class="material-icons">fact_check</span>
+                      <p>{{ reports.length === 0 ? 'No reports found.' : 'No reports match the current filters.' }}</p>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
         </div>
+        @if (!isLoadingReports && reportTotalPages > 1) {
+          <div class="pagination-footer">
+            <span class="page-info">
+              Page {{ reportPage }} of {{ reportTotalPages }} &middot; {{ filteredReports.length }} reports
+            </span>
+            <div class="page-controls">
+              <button class="action-btn outline small" (click)="reportPrevPage()" [disabled]="reportPage === 1">
+                <span class="material-icons">chevron_left</span> Prev
+              </button>
+              <button class="action-btn outline small" (click)="reportNextPage()" [disabled]="reportPage === reportTotalPages">
+                Next <span class="material-icons">chevron_right</span>
+              </button>
+            </div>
+          </div>
+        }
       </div>
     }
 
@@ -417,10 +465,10 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="action-btn outline" (click)="closeTemplateModal()">Cancel</button>
-            <button type="submit" class="action-btn primary">
+            <button type="button" class="action-btn outline" (click)="closeTemplateModal()" [disabled]="isSubmitting">Cancel</button>
+            <button type="submit" class="action-btn primary" [disabled]="isSubmitting">
               <span class="material-icons">save</span>
-              {{ editingTemplate ? 'Update' : 'Create' }}
+              {{ isSubmitting ? 'Saving...' : (editingTemplate ? 'Update' : 'Create') }}
             </button>
           </div>
         </form>
@@ -439,6 +487,17 @@
           </button>
         </div>
         <form (ngSubmit)="saveField()" class="modal-body">
+          @if (isAllFieldsMode && !editingField) {
+            <div class="form-group">
+              <label>Template</label>
+              <select [(ngModel)]="fieldTargetTemplateId" name="fieldTargetTemplateId" required>
+                <option [ngValue]="null">Select Template</option>
+                @for (t of templates; track t.templateId) {
+                  <option [ngValue]="t.templateId">{{ t.regulationCode }}</option>
+                }
+              </select>
+            </div>
+          }
           <div class="form-group">
             <label>Field Name</label>
             <input type="text" [(ngModel)]="fieldForm.fieldName" name="fieldName" required placeholder="e.g. total_assets" />
@@ -466,10 +525,10 @@
             </label>
           </div>
           <div class="modal-footer">
-            <button type="button" class="action-btn outline" (click)="closeFieldModal()">Cancel</button>
-            <button type="submit" class="action-btn primary">
+            <button type="button" class="action-btn outline" (click)="closeFieldModal()" [disabled]="isSubmitting">Cancel</button>
+            <button type="submit" class="action-btn primary" [disabled]="isSubmitting">
               <span class="material-icons">save</span>
-              {{ editingField ? 'Update' : 'Create' }}
+              {{ isSubmitting ? 'Saving...' : (editingField ? 'Update' : 'Create') }}
             </button>
           </div>
         </form>
@@ -527,10 +586,10 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="action-btn outline" (click)="closeUserModal()">Cancel</button>
-            <button type="submit" class="action-btn primary">
+            <button type="button" class="action-btn outline" (click)="closeUserModal()" [disabled]="isSubmitting">Cancel</button>
+            <button type="submit" class="action-btn primary" [disabled]="isSubmitting">
               <span class="material-icons">save</span>
-              {{ editingUser ? 'Update' : 'Create' }}
+              {{ isSubmitting ? 'Saving...' : (editingUser ? 'Update' : 'Create') }}
             </button>
           </div>
         </form>
