@@ -2,6 +2,7 @@ package com.cts.regreportx.controller;
 
 import com.cts.regreportx.dto.RiskMetricDTO;
 import com.cts.regreportx.model.RiskMetric;
+import com.cts.regreportx.service.NotificationService;
 import com.cts.regreportx.service.RiskCalculationService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +23,13 @@ public class RiskController {
 
     private final RiskCalculationService riskCalculationService;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @Autowired
-    public RiskController(RiskCalculationService riskCalculationService, ModelMapper modelMapper) {
+    public RiskController(RiskCalculationService riskCalculationService, ModelMapper modelMapper, NotificationService notificationService) {
         this.riskCalculationService = riskCalculationService;
         this.modelMapper = modelMapper;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/metrics")
@@ -50,6 +53,9 @@ public class RiskController {
         Map<String, Object> response = new HashMap<>();
         response.put("reportId", reportId);
         response.put("metricsCalculated", metricNames);
+
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "Risk metrics ready for Report #" + reportId + " — proceed with exception generation", "Risk");
+        notificationService.notifyRole("REPORTING_OFFICER", "Risk metrics completed for draft Report #" + reportId, "Risk");
 
         return ResponseEntity.ok(response);
     }

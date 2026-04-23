@@ -2,6 +2,7 @@ package com.cts.regreportx.controller;
 
 import com.cts.regreportx.dto.RawRecordDTO;
 import com.cts.regreportx.model.RawRecord;
+import com.cts.regreportx.service.NotificationService;
 import com.cts.regreportx.service.RawRecordService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,11 +22,13 @@ public class RawRecordController {
 
     private final RawRecordService rawRecordService;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @Autowired
-    public RawRecordController(RawRecordService rawRecordService, ModelMapper modelMapper) {
+    public RawRecordController(RawRecordService rawRecordService, ModelMapper modelMapper, NotificationService notificationService) {
         this.rawRecordService = rawRecordService;
         this.modelMapper = modelMapper;
+        this.notificationService = notificationService;
     }
 
     @PostMapping("/load/{batchId}")
@@ -34,6 +37,7 @@ public class RawRecordController {
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Raw records loaded successfully");
         response.put("recordsInserted", recordsInserted);
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "Raw records loaded for batch #" + batchId + " — validation can start", "Raw Records");
         return ResponseEntity.ok(response);
     }
 

@@ -3,6 +3,7 @@ package com.cts.regreportx.controller;
 import com.cts.regreportx.dto.UserDTO;
 import com.cts.regreportx.model.User;
 import com.cts.regreportx.repository.UserRepository;
+import com.cts.regreportx.service.NotificationService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,12 +25,14 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @Autowired
-    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, ModelMapper modelMapper) {
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, ModelMapper modelMapper, NotificationService notificationService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.modelMapper = modelMapper;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -61,6 +64,8 @@ public class UserController {
         newUser.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
 
         userRepository.save(newUser);
+
+        notificationService.notifyUser(newUser.getId(), "Your account has been created. Welcome to RegReportX!", "Account");
 
         return ResponseEntity.ok(Map.of("message", "User created successfully", "userId", newUser.getId()));
     }
@@ -96,6 +101,8 @@ public class UserController {
 
         userRepository.save(user);
 
+        notificationService.notifyUser(id, "Your account has been updated by an administrator", "Account");
+
         return ResponseEntity.ok(Map.of("message", "User updated successfully"));
     }
 
@@ -106,6 +113,7 @@ public class UserController {
             return ResponseEntity.notFound().build();
         }
 
+        notificationService.notifyUser(id, "Your account has been deleted", "Account");
         userRepository.deleteById(id);
         return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
     }
@@ -125,6 +133,7 @@ public class UserController {
         }
 
         userRepository.save(user);
+        notificationService.notifyUser(id, "Your account has been " + user.getStatus().toLowerCase(), "Account");
         return ResponseEntity
                 .ok(Map.of("message", "User status updated to " + user.getStatus(), "status", user.getStatus()));
     }

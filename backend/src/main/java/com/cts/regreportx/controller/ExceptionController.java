@@ -4,6 +4,7 @@ import com.cts.regreportx.dto.ExceptionRecordDTO;
 import com.cts.regreportx.dto.ExceptionResolveRequest;
 import com.cts.regreportx.model.ExceptionRecord;
 import com.cts.regreportx.service.AuditService;
+import com.cts.regreportx.service.NotificationService;
 import com.cts.regreportx.service.ReportingService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,12 +25,14 @@ public class ExceptionController {
     private final ReportingService reportingService;
     private final ModelMapper modelMapper;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
-    public ExceptionController(ReportingService reportingService, ModelMapper modelMapper, AuditService auditService) {
+    public ExceptionController(ReportingService reportingService, ModelMapper modelMapper, AuditService auditService, NotificationService notificationService) {
         this.reportingService = reportingService;
         this.modelMapper = modelMapper;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/open")
@@ -48,6 +51,7 @@ public class ExceptionController {
             ExceptionRecord resolved = reportingService.resolveException(id, request);
             auditService.logAction("RESOLVED_EXCEPTION", "Exceptions",
                     "Exception #" + id + " | Justification: " + request.getJustification());
+            notificationService.notifyRole("REPORTING_OFFICER", "Exception #" + id + " resolved — report can proceed", "Exception");
             return ResponseEntity.ok(Map.of(
                     "message", "Exception resolved successfully and CorrectionLog generated.",
                     "exception", modelMapper.map(resolved, ExceptionRecordDTO.class)
@@ -66,6 +70,8 @@ public class ExceptionController {
                     .collect(Collectors.toList());
             auditService.logAction("GENERATED_EXCEPTIONS", "Exceptions",
                     "Report #" + reportId + " | Generated " + dtos.size() + " exceptions");
+            notificationService.notifyRole("OPERATIONS_OFFICER", "Exceptions generated for Report #" + reportId + " — investigation needed", "Exception");
+            notificationService.notifyRole("RISK_ANALYST", "Exceptions generated for Report #" + reportId + " — investigation needed", "Exception");
             return ResponseEntity.ok(Map.of(
                     "message", "Exceptions generated successfully for report ID " + reportId,
                     "count", dtos.size(),

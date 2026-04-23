@@ -1,4 +1,4 @@
-import { Component, OnInit, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -7,10 +7,12 @@ import { TemplateService } from '../../services/template.service';
 import { ReportService } from '../../services/report.service';
 import { UserService } from '../../services/user.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationService } from '../../services/notification.service';
 import { RegTemplate, TemplateField } from '../../models/template.model';
 import { RegReport } from '../../models/report.model';
 import { User } from '../../models/user.model';
 import { AuditLog } from '../../models/audit-log.model';
+import { AppNotification } from '../../models/notification.model';
 import { Chart, registerables } from 'chart.js';
 import { finalize } from 'rxjs';
 
@@ -23,7 +25,7 @@ Chart.register(...registerables);
   templateUrl: './admin.html',
   styleUrl: './admin.css'
 })
-export class AdminComponent implements OnInit, AfterViewInit {
+export class AdminComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('templateChart') templateChartRef!: ElementRef<HTMLCanvasElement>;
   @ViewChild('fieldsChart') fieldsChartRef!: ElementRef<HTMLCanvasElement>;
 
@@ -109,12 +111,19 @@ export class AdminComponent implements OnInit, AfterViewInit {
   auditPage = 1;
   readonly auditPageSize = 10;
 
+  // Notifications
+  notifications: AppNotification[] = [];
+  unreadCount = 0;
+  showNotifPanel = false;
+  private notifInterval: any;
+
   constructor(
     public authService: AuthService,
     private templateService: TemplateService,
     private reportService: ReportService,
     private userService: UserService,
     private auditService: AuditService,
+    private notifService: NotificationService,
     private router: Router,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -135,6 +144,12 @@ export class AdminComponent implements OnInit, AfterViewInit {
   ngOnInit(): void {
     this.username = this.authService.getUsername();
     this.loadTemplates();
+    this.pollNotifications();
+    this.notifInterval = setInterval(() => this.pollNotifications(), 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.notifInterval) clearInterval(this.notifInterval);
   }
 
   ngAfterViewInit(): void {
@@ -167,6 +182,55 @@ export class AdminComponent implements OnInit, AfterViewInit {
   showNotification(message: string, type: 'success' | 'error'): void {
     this.notification = { message, type };
     setTimeout(() => this.notification = null, 4000);
+  }
+
+  // --- Notification Bell ---
+  pollNotifications(): void {
+    this.notifService.getUnreadCount().subscribe({
+      next: (res) => this.run(() => this.unreadCount = res.count),
+      error: () => {}
+    });
+  }
+
+  toggleNotifPanel(): void {
+    this.showNotifPanel = !this.showNotifPanel;
+    if (this.showNotifPanel) {
+      this.notifService.getNotifications().subscribe({
+        next: (data) => this.run(() => this.notifications = data),
+        error: () => {}
+      });
+    }
+  }
+
+  markNotifRead(id: number): void {
+    this.notifService.markAsRead(id).subscribe({
+      next: () => this.run(() => {
+        const n = this.notifications.find(x => x.notificationId === id);
+        if (n) n.status = 'READ';
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+      }),
+      error: () => {}
+    });
+  }
+
+  markAllNotifRead(): void {
+    this.notifService.markAllAsRead().subscribe({
+      next: () => this.run(() => {
+        this.notifications.forEach(n => n.status = 'READ');
+        this.unreadCount = 0;
+      }),
+      error: () => {}
+    });
+  }
+
+  getNotifIcon(category: string): string {
+    const map: Record<string, string> = {
+      'Report': 'description', 'Risk': 'trending_up', 'Validation': 'rule',
+      'Data Upload': 'upload_file', 'Ingestion': 'input', 'Exception': 'warning',
+      'Data Quality': 'verified', 'Template': 'view_column', 'Account': 'person',
+      'Raw Records': 'storage'
+    };
+    return map[category] || 'notifications';
   }
 
   // --- Template Management ---
@@ -347,11 +411,37 @@ export class AdminComponent implements OnInit, AfterViewInit {
     });
   }
 
-  approveReport(id: number): void {
-    if (this.approvingReportId !== null) return;
+  // --- Report Approval Modal ---
+  showApproveModal = false;
+  approveReportId: number | null = null;
+  approveComments = '';
+
+  openApproveModal(id: number): void {
+    this.approveReportId = id;
+    this.approveComments = '';
+    this.showApproveModal = true;
+  }
+
+  closeApproveModal(): void {
+    this.showApproveModal = false;
+    this.approveReportId = null;
+    this.approveComments = '';
+  }
+
+  confirmApproveReport(): void {
+    if (!this.approveReportId || this.approvingReportId !== null) return;
+    const id = this.approveReportId;
+    const comments = this.approveComments;
+    
     this.approvingReportId = id;
-    this.reportService.approveReport(id, 1).pipe(
-      finalize(() => this.run(() => this.approvingReportId = null))
+    this.showApproveModal = false;
+    
+    this.reportService.approveReport(id, 1, comments).pipe(
+      finalize(() => this.run(() => {
+        this.approvingReportId = null;
+        this.approveReportId = null;
+        this.approveComments = '';
+      }))
     ).subscribe({
       next: (updated) => this.run(() => {
         const idx = this.reports.findIndex(r => r.reportId === id);

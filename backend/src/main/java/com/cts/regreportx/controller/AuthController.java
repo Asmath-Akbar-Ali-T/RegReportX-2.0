@@ -35,6 +35,11 @@ public class AuthController {
         if (authentication.isAuthenticated()) {
             User user = userRepository.findByUsername(authRequest.getUsername())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            
+            if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                return ResponseEntity.status(403).body(Map.of("message", "User is not currently active."));
+            }
+
             String token = jwtService.generateToken(user.getUsername(), user.getRole());
             return ResponseEntity.ok(Map.of("token", token));
         } else {

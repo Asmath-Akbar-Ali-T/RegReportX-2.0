@@ -63,7 +63,7 @@ export class LoginComponent {
         this.run(() => {
           this.isLoading = false;
           if (err.status === 401 || err.status === 403) {
-            this.errorMessage = 'Invalid username or password.';
+            this.errorMessage = err.error?.message || 'Invalid username or password.';
           } else if (err.status === 0) {
             this.errorMessage = 'Unable to connect to server. Please try again.';
           } else {

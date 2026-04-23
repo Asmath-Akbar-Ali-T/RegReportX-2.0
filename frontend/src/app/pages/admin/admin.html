@@ -38,6 +38,12 @@
     </nav>
 
     <div class="sidebar-footer">
+      <button class="notif-bell-btn" (click)="toggleNotifPanel()" id="notif-bell-btn">
+        <span class="material-icons">notifications</span>
+        @if (unreadCount > 0) {
+          <span class="notif-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        }
+      </button>
       <div class="user-info">
         <div class="user-avatar">
           <span class="material-icons">person</span>
@@ -53,6 +59,42 @@
       </button>
     </div>
   </aside>
+
+  <!-- Notification Panel -->
+  @if (showNotifPanel) {
+    <div class="notif-overlay" (click)="toggleNotifPanel()"></div>
+    <div class="notif-panel">
+      <div class="notif-panel-header">
+        <h3><span class="material-icons">notifications</span> Notifications</h3>
+        <div class="notif-header-actions">
+          @if (unreadCount > 0) {
+            <button class="notif-mark-all" (click)="markAllNotifRead()">Mark all read</button>
+          }
+          <button class="notif-close" (click)="toggleNotifPanel()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+      <div class="notif-panel-body">
+        @for (n of notifications; track n.notificationId) {
+          <div class="notif-item" [class.notif-unread]="n.status === 'UNREAD'" (click)="markNotifRead(n.notificationId)">
+            <span class="material-icons notif-item-icon">{{ getNotifIcon(n.category) }}</span>
+            <div class="notif-item-content">
+              <span class="notif-item-category">{{ n.category }}</span>
+              <p class="notif-item-message">{{ n.message }}</p>
+              <span class="notif-item-time">{{ n.createdDate | date:'short' }}</span>
+            </div>
+          </div>
+        }
+        @if (notifications.length === 0) {
+          <div class="notif-empty">
+            <span class="material-icons">notifications_none</span>
+            <p>No notifications yet</p>
+          </div>
+        }
+      </div>
+    </div>
+  }
 
   <!-- Main Content -->
   <main class="main-content">
@@ -293,7 +335,7 @@
                     <td>
                       <button
                         class="action-btn success small"
-                        (click)="approveReport(r.reportId!)"
+                        (click)="openApproveModal(r.reportId!)"
                         [disabled]="r.status === 'APPROVED' || r.status === 'FILED' || approvingReportId === r.reportId"
                         id="approve-btn-{{r.reportId}}"
                       >
@@ -710,6 +752,33 @@
             <button type="submit" class="action-btn primary" [disabled]="isSubmitting">
               <span class="material-icons">save</span>
               {{ isSubmitting ? 'Saving...' : (editingUser ? 'Update' : 'Create') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+  <!-- ==================== APPROVE REPORT MODAL ==================== -->
+  @if (showApproveModal) {
+    <div class="modal-overlay" (click)="closeApproveModal()">
+      <div class="modal" (click)="$event.stopPropagation()" id="approve-modal">
+        <div class="modal-header">
+          <h2>Approve Report</h2>
+          <button class="close-btn" (click)="closeApproveModal()">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <form (ngSubmit)="confirmApproveReport()" class="modal-body">
+          <p>Please enter any comments for this approval (optional):</p>
+          <div class="form-group">
+            <label>Comments</label>
+            <textarea [(ngModel)]="approveComments" name="comments" rows="4" placeholder="Enter your review comments here..."></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="action-btn outline" (click)="closeApproveModal()" [disabled]="approvingReportId !== null">Cancel</button>
+            <button type="submit" class="action-btn success" [disabled]="approvingReportId !== null">
+              <span class="material-icons">check_circle</span>
+              {{ approvingReportId !== null ? 'Approving...' : 'Approve' }}
             </button>
           </div>
         </form>

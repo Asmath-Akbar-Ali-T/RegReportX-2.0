@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -9,6 +9,8 @@ import { TemplateService } from '../../services/template.service';
 import { RegReport } from '../../models/report.model';
 import { RegTemplate } from '../../models/template.model';
 import { AuditLog } from '../../models/audit-log.model';
+import { AppNotification } from '../../models/notification.model';
+import { NotificationService } from '../../services/notification.service';
 import { finalize } from 'rxjs/operators';
 
 type ActiveView = 'dashboard' | 'generate' | 'list' | 'file' | 'audit';
@@ -24,9 +26,9 @@ interface Toast {
   standalone: true,
   imports: [CommonModule, RouterLink, FormsModule],
   templateUrl: './reporting.html',
-  styleUrl: './reporting.css'
+  styleUrls: ['./reporting.css', '../shared/notification-panel.css']
 })
-export class ReportingComponent implements OnInit {
+export class ReportingComponent implements OnInit, OnDestroy {
   username = '';
   activeView: ActiveView = 'dashboard';
 
@@ -71,6 +73,12 @@ export class ReportingComponent implements OnInit {
   auditPageSize = 10;
   isLoadingAudit = false;
 
+  // Notifications
+  notifications: AppNotification[] = [];
+  unreadCount = 0;
+  showNotifPanel = false;
+  private notifInterval: any;
+
   readonly STATUS_OPTIONS = ['ALL', 'DRAFT', 'UNDER REVIEW', 'APPROVED', 'FILED'];
   readonly PERIODS = [
     '2026-Q1', '2026-Q2', '2026-Q3', '2026-Q4',
@@ -83,6 +91,7 @@ export class ReportingComponent implements OnInit {
     private reportService: ReportService,
     private auditService: AuditService,
     private templateService: TemplateService,
+    private notifService: NotificationService,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
   ) {
@@ -104,6 +113,57 @@ export class ReportingComponent implements OnInit {
   ngOnInit(): void {
     this.loadReports();
     this.loadTemplates();
+    this.pollNotifications();
+    this.notifInterval = setInterval(() => this.pollNotifications(), 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.notifInterval) clearInterval(this.notifInterval);
+  }
+
+  // --- Notification Bell ---
+  pollNotifications(): void {
+    this.notifService.getUnreadCount().subscribe({
+      next: (res) => this.run(() => this.unreadCount = res.count),
+      error: () => {}
+    });
+  }
+  toggleNotifPanel(): void {
+    this.showNotifPanel = !this.showNotifPanel;
+    if (this.showNotifPanel) {
+      this.notifService.getNotifications().subscribe({
+        next: (data) => this.run(() => this.notifications = data),
+        error: () => {}
+      });
+    }
+  }
+  markNotifRead(id: number): void {
+    this.notifService.markAsRead(id).subscribe({
+      next: () => this.run(() => {
+        const n = this.notifications.find(x => x.notificationId === id);
+        if (n) n.status = 'READ';
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+      }),
+      error: () => {}
+    });
+  }
+  markAllNotifRead(): void {
+    this.notifService.markAllAsRead().subscribe({
+      next: () => this.run(() => {
+        this.notifications.forEach(n => n.status = 'READ');
+        this.unreadCount = 0;
+      }),
+      error: () => {}
+    });
+  }
+  getNotifIcon(category: string): string {
+    const map: Record<string, string> = {
+      'Report': 'description', 'Risk': 'trending_up', 'Validation': 'rule',
+      'Data Upload': 'upload_file', 'Ingestion': 'input', 'Exception': 'warning',
+      'Data Quality': 'verified', 'Template': 'view_column', 'Account': 'person',
+      'Raw Records': 'storage'
+    };
+    return map[category] || 'notifications';
   }
 
   // Navigation

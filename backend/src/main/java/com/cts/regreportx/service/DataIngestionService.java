@@ -4,6 +4,10 @@ import com.cts.regreportx.model.DataSource;
 import com.cts.regreportx.model.RawDataBatch;
 import com.cts.regreportx.repository.DataSourceRepository;
 import com.cts.regreportx.repository.RawDataBatchRepository;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,16 +23,19 @@ public class DataIngestionService {
     private final RawDataBatchRepository rawDataBatchRepository;
     private final SourceDataService sourceDataService;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
     public DataIngestionService(DataSourceRepository dataSourceRepository,
             RawDataBatchRepository rawDataBatchRepository,
             SourceDataService sourceDataService,
-            AuditService auditService) {
+            AuditService auditService,
+            NotificationService notificationService) {
         this.dataSourceRepository = dataSourceRepository;
         this.rawDataBatchRepository = rawDataBatchRepository;
         this.sourceDataService = sourceDataService;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @PostConstruct
@@ -73,6 +80,8 @@ public class DataIngestionService {
 
             auditService.logAction("RUN_INGESTION", resourceName);
         }
+
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "Data ingestion completed — ready for validation", "Ingestion");
 
         return batches;
     }

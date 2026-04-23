@@ -34,6 +34,10 @@
     </nav>
 
     <div class="sidebar-footer">
+      <button class="notif-bell-btn" (click)="toggleNotifPanel()">
+        <span class="material-icons">notifications</span>
+        <span class="notif-badge" *ngIf="unreadCount > 0">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+      </button>
       <div class="user-info">
         <div class="user-avatar">
           <span class="material-icons">person</span>
@@ -49,6 +53,32 @@
       </button>
     </div>
   </aside>
+
+  <!-- Notification Panel -->
+  <div class="notif-overlay" *ngIf="showNotifPanel" (click)="toggleNotifPanel()"></div>
+  <div class="notif-panel" *ngIf="showNotifPanel">
+    <div class="notif-panel-header">
+      <h3><span class="material-icons">notifications</span> Notifications</h3>
+      <div class="notif-header-actions">
+        <button class="notif-mark-all" *ngIf="unreadCount > 0" (click)="markAllNotifRead()">Mark all read</button>
+        <button class="notif-close" (click)="toggleNotifPanel()"><span class="material-icons">close</span></button>
+      </div>
+    </div>
+    <div class="notif-panel-body">
+      <div class="notif-item" *ngFor="let n of notifications" [class.notif-unread]="n.status === 'UNREAD'" (click)="markNotifRead(n.notificationId)">
+        <span class="material-icons notif-item-icon">{{ getNotifIcon(n.category) }}</span>
+        <div class="notif-item-content">
+          <span class="notif-item-category">{{ n.category }}</span>
+          <p class="notif-item-message">{{ n.message }}</p>
+          <span class="notif-item-time">{{ n.createdDate | date:'short' }}</span>
+        </div>
+      </div>
+      <div class="notif-empty" *ngIf="notifications.length === 0">
+        <span class="material-icons">notifications_none</span>
+        <p>No notifications yet</p>
+      </div>
+    </div>
+  </div>
 
   <!-- Main Content -->
   <main class="main-content">

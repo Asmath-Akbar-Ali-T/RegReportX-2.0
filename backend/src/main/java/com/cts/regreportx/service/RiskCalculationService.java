@@ -2,7 +2,6 @@ package com.cts.regreportx.service;
 
 import com.cts.regreportx.component.DynamicRiskEvaluator;
 import com.cts.regreportx.model.*;
-import com.cts.regreportx.repository.NotificationRepository;
 import com.cts.regreportx.repository.RegReportRepository;
 import com.cts.regreportx.repository.RiskMetricRepository;
 import com.cts.regreportx.repository.UserRepository;
@@ -23,7 +22,6 @@ public class RiskCalculationService {
 
     private final SourceDataService sourceDataService;
     private final RiskMetricRepository riskMetricRepository;
-    private final NotificationRepository notificationRepository;
     private final AuditService auditService;
     private final DynamicRiskEvaluator riskEvaluator;
     private final TemplateService templateService;
@@ -33,7 +31,6 @@ public class RiskCalculationService {
     @Autowired
     public RiskCalculationService(SourceDataService sourceDataService,
             RiskMetricRepository riskMetricRepository,
-            NotificationRepository notificationRepository,
             AuditService auditService,
             DynamicRiskEvaluator riskEvaluator,
             TemplateService templateService,
@@ -41,7 +38,6 @@ public class RiskCalculationService {
             UserRepository userRepository) {
         this.sourceDataService = sourceDataService;
         this.riskMetricRepository = riskMetricRepository;
-        this.notificationRepository = notificationRepository;
         this.auditService = auditService;
         this.riskEvaluator = riskEvaluator;
         this.templateService = templateService;
@@ -155,19 +151,7 @@ public class RiskCalculationService {
             metrics.add(createMetric(report, field.getFieldName(), calculatedValue));
         }
 
-        if (context.containsKey("CRAR") && context.get("CRAR").compareTo(new BigDecimal("9")) < 0) {
-            generateRiskAlert("Capital breach: CRAR is below 9% threshold (" + context.get("CRAR") + "%) for Report ID "
-                    + reportId);
-        }
-        if (context.containsKey("LCR") && context.get("LCR").compareTo(new BigDecimal("100")) < 0) {
-            generateRiskAlert("Liquidity breach: LCR is below 100% threshold (" + context.get("LCR")
-                    + "%) for Report ID " + reportId);
-        }
-        if (context.containsKey("Loan_to_Deposit_Ratio")
-                && context.get("Loan_to_Deposit_Ratio").compareTo(new BigDecimal("90")) > 0) {
-            generateRiskAlert("High lending risk: Loan-to-Deposit Ratio exceeds safe limit ("
-                    + context.get("Loan_to_Deposit_Ratio") + "%) for Report ID " + reportId);
-        }
+
 
         auditService.logAction("CALCULATE_RISK_METRICS", "ReportID: " + reportId,
                 "Dynamically calculated " + metrics.size() + " metrics.");
@@ -189,15 +173,7 @@ public class RiskCalculationService {
         }
     }
 
-    private void generateRiskAlert(String message) {
-        Notification notification = new Notification();
-        notification.setUser(userRepository.getReferenceById(1L));
-        notification.setMessage(message);
-        notification.setCategory("Risk");
-        notification.setStatus("UNREAD");
-        notification.setCreatedDate(LocalDateTime.now());
-        notificationRepository.save(notification);
-    }
+
 
     private RiskMetric createMetric(RegReport report, String name, BigDecimal value) {
         RiskMetric metric = new RiskMetric();

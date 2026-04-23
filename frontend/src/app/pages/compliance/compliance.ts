@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,10 +9,12 @@ import { DataQualityService } from '../../services/data-quality.service';
 import { ReportService } from '../../services/report.service';
 import { ExceptionService } from '../../services/exception.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationService } from '../../services/notification.service';
 import { DataQualityIssue } from '../../models/data-quality.model';
 import { RegReport } from '../../models/report.model';
 import { ExceptionRecord } from '../../models/exception.model';
 import { AuditLog } from '../../models/audit-log.model';
+import { AppNotification } from '../../models/notification.model';
 import Chart from 'chart.js/auto';
 
 @Component({
@@ -20,10 +22,16 @@ import Chart from 'chart.js/auto';
   standalone: true,
   imports: [CommonModule, RouterLink, FormsModule],
   templateUrl: './compliance.html',
-  styleUrl: './compliance.css'
+  styleUrls: ['./compliance.css', '../shared/notification-panel.css']
 })
-export class ComplianceComponent implements OnInit {
+export class ComplianceComponent implements OnInit, OnDestroy {
   username = '';
+
+  // Notifications
+  notifications: AppNotification[] = [];
+  unreadCount = 0;
+  showNotifPanel = false;
+  private notifInterval: any;
   activeTab: 'validation' | 'quality' | 'exceptions' | 'submit' | 'audit' = 'validation';
   Math = Math;
 
@@ -85,6 +93,8 @@ export class ComplianceComponent implements OnInit {
     private reportService: ReportService,
     private exceptionService: ExceptionService,
     private auditService: AuditService,
+    private notifService: NotificationService,
+    private zone: NgZone,
     private router: Router,
     private cdr: ChangeDetectorRef
   ) {
@@ -102,6 +112,20 @@ export class ComplianceComponent implements OnInit {
         console.warn('Loading safety net triggered: forced counter reset');
       }
     }, 5000);
+
+    this.pollNotifications();
+    this.notifInterval = setInterval(() => this.pollNotifications(), 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.notifInterval) clearInterval(this.notifInterval);
+  }
+
+  private run(fn: () => void): void {
+    this.zone.run(() => {
+      fn();
+      this.cdr.detectChanges();
+    });
   }
 
   private startLoading(): void {
@@ -544,6 +568,51 @@ export class ComplianceComponent implements OnInit {
     if (tab === 'audit') this.loadAuditLogs();
   }
 
+  // --- Notification Bell ---
+  pollNotifications(): void {
+    this.notifService.getUnreadCount().subscribe({
+      next: (res) => this.run(() => this.unreadCount = res.count),
+      error: () => {}
+    });
+  }
+  toggleNotifPanel(): void {
+    this.showNotifPanel = !this.showNotifPanel;
+    if (this.showNotifPanel) {
+      this.notifService.getNotifications().subscribe({
+        next: (data) => this.run(() => this.notifications = data),
+        error: () => {}
+      });
+    }
+  }
+  markNotifRead(id: number): void {
+    this.notifService.markAsRead(id).subscribe({
+      next: () => this.run(() => {
+        const n = this.notifications.find(x => x.notificationId === id);
+        if (n) n.status = 'READ';
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+      }),
+      error: () => {}
+    });
+  }
+  markAllNotifRead(): void {
+    this.notifService.markAllAsRead().subscribe({
+      next: () => this.run(() => {
+        this.notifications.forEach(n => n.status = 'READ');
+        this.unreadCount = 0;
+      }),
+      error: () => {}
+    });
+  }
+  getNotifIcon(category: string): string {
+    const map: Record<string, string> = {
+      'Report': 'description', 'Risk': 'trending_up', 'Validation': 'rule',
+      'Data Upload': 'upload_file', 'Ingestion': 'input', 'Exception': 'warning',
+      'Data Quality': 'verified', 'Template': 'view_column', 'Account': 'person',
+      'Raw Records': 'storage'
+    };
+    return map[category] || 'notifications';
+  }
+
   loadValidationIssues(): void {
     this.startLoading();
     this.validationService.getIssues().pipe(
@@ -686,6 +755,10 @@ export class ComplianceComponent implements OnInit {
   }
 
   submitForApproval(reportId: number): void {
+    if (this.openExceptions.length > 0) {
+      this.showNotification('Cannot submit report. Please resolve all open report exceptions first.', 'error');
+      return;
+    }
     this.startLoading();
     this.reportService.submitReport(reportId).pipe(
       finalize(() => this.stopLoading())
@@ -694,8 +767,9 @@ export class ComplianceComponent implements OnInit {
         this.showNotification('Report submitted for approval', 'success');
         this.loadDraftReports();
       },
-      error: () => {
-        this.showNotification('Failed to submit report', 'error');
+      error: (error) => {
+        const errorMsg = error.error?.message || 'Failed to submit report. Please check if all issues are resolved.';
+        this.showNotification(errorMsg, 'error');
       }
     });
   }

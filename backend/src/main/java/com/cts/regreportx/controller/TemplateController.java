@@ -4,6 +4,7 @@ import com.cts.regreportx.dto.RegTemplateDTO;
 import com.cts.regreportx.dto.TemplateFieldDTO;
 import com.cts.regreportx.model.RegTemplate;
 import com.cts.regreportx.model.TemplateField;
+import com.cts.regreportx.service.NotificationService;
 import com.cts.regreportx.service.TemplateService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,11 +23,13 @@ public class TemplateController {
 
     private final TemplateService templateService;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @Autowired
-    public TemplateController(TemplateService templateService, ModelMapper modelMapper) {
+    public TemplateController(TemplateService templateService, ModelMapper modelMapper, NotificationService notificationService) {
         this.templateService = templateService;
         this.modelMapper = modelMapper;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -49,6 +52,8 @@ public class TemplateController {
     public ResponseEntity<RegTemplateDTO> createTemplate(@RequestBody RegTemplateDTO templateDto) {
         RegTemplate template = modelMapper.map(templateDto, RegTemplate.class);
         RegTemplate saved = templateService.createTemplate(template);
+        notificationService.notifyRole("REPORTING_OFFICER", "New reporting template created: " + saved.getRegulationCode(), "Template");
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "New reporting template created: " + saved.getRegulationCode(), "Template");
         return ResponseEntity.ok(modelMapper.map(saved, RegTemplateDTO.class));
     }
 
@@ -57,6 +62,8 @@ public class TemplateController {
         try {
             RegTemplate template = modelMapper.map(templateDto, RegTemplate.class);
             RegTemplate updated = templateService.updateTemplate(id, template);
+            notificationService.notifyRole("REPORTING_OFFICER", "Reporting template updated: " + updated.getRegulationCode(), "Template");
+            notificationService.notifyRole("COMPLIANCE_ANALYST", "Reporting template updated: " + updated.getRegulationCode(), "Template");
             return ResponseEntity.ok(modelMapper.map(updated, RegTemplateDTO.class));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -66,6 +73,8 @@ public class TemplateController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteTemplate(@PathVariable Integer id) {
         templateService.deleteTemplate(id);
+        notificationService.notifyRole("REPORTING_OFFICER", "A reporting template has been deleted", "Template");
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "A reporting template has been deleted", "Template");
         return ResponseEntity.ok().build();
     }
 
@@ -83,6 +92,8 @@ public class TemplateController {
             @RequestBody TemplateFieldDTO fieldDto) {
         TemplateField field = modelMapper.map(fieldDto, TemplateField.class);
         TemplateField saved = templateService.addFieldToTemplate(templateId, field);
+        notificationService.notifyRole("REPORTING_OFFICER", "New field added to template: " + saved.getFieldName(), "Template");
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "New field added to template: " + saved.getFieldName(), "Template");
         return ResponseEntity.ok(modelMapper.map(saved, TemplateFieldDTO.class));
     }
 
@@ -91,6 +102,8 @@ public class TemplateController {
         try {
             TemplateField field = modelMapper.map(fieldDto, TemplateField.class);
             TemplateField updated = templateService.updateField(fieldId, field);
+            notificationService.notifyRole("REPORTING_OFFICER", "Template field updated: " + updated.getFieldName(), "Template");
+            notificationService.notifyRole("COMPLIANCE_ANALYST", "Template field updated: " + updated.getFieldName(), "Template");
             return ResponseEntity.ok(modelMapper.map(updated, TemplateFieldDTO.class));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -100,6 +113,8 @@ public class TemplateController {
     @DeleteMapping("/fields/{fieldId}")
     public ResponseEntity<Void> deleteField(@PathVariable Integer fieldId) {
         templateService.deleteField(fieldId);
+        notificationService.notifyRole("REPORTING_OFFICER", "A template field has been deleted", "Template");
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "A template field has been deleted", "Template");
         return ResponseEntity.ok().build();
     }
 }

@@ -2,7 +2,6 @@ package com.cts.regreportx.service;
 
 import com.cts.regreportx.component.DynamicRiskEvaluator;
 import com.cts.regreportx.model.*;
-import com.cts.regreportx.repository.NotificationRepository;
 import com.cts.regreportx.repository.RegReportRepository;
 import com.cts.regreportx.repository.RiskMetricRepository;
 import com.cts.regreportx.repository.UserRepository;
@@ -30,7 +29,6 @@ public class RiskCalculationServiceTest {
 
     @Mock private SourceDataService sourceDataService;
     @Mock private RiskMetricRepository riskMetricRepository;
-    @Mock private NotificationRepository notificationRepository;
     @Mock private AuditService auditService;
     @Mock private DynamicRiskEvaluator riskEvaluator;
     @Mock private TemplateService templateService;

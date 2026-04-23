@@ -3,6 +3,7 @@ package com.cts.regreportx.controller;
 import com.cts.regreportx.dto.RegReportDTO;
 import com.cts.regreportx.model.RegReport;
 import com.cts.regreportx.service.AuditService;
+import com.cts.regreportx.service.NotificationService;
 import com.cts.regreportx.service.ReportingService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +21,14 @@ public class ReportController {
     private final ReportingService reportingService;
     private final ModelMapper modelMapper;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
-    public ReportController(ReportingService reportingService, ModelMapper modelMapper, AuditService auditService) {
+    public ReportController(ReportingService reportingService, ModelMapper modelMapper, AuditService auditService, NotificationService notificationService) {
         this.reportingService = reportingService;
         this.modelMapper = modelMapper;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @PostMapping("/generate")
@@ -36,6 +39,8 @@ public class ReportController {
         RegReport report = reportingService.generateReport(templateId, period);
         auditService.logAction("GENERATED_REPORT", "Reports",
                 "Template #" + templateId + " | Period: " + period + " | Report #" + report.getReportId());
+        notificationService.notifyRole("COMPLIANCE_ANALYST", "Draft report #" + report.getReportId() + " ready for review", "Report");
+        notificationService.notifyRole("RISK_ANALYST", "Draft report #" + report.getReportId() + " generated — metrics can now be calculated", "Report");
         return ResponseEntity.ok(modelMapper.map(report, RegReportDTO.class));
     }
 
@@ -61,6 +66,7 @@ public class ReportController {
         try {
             RegReport report = reportingService.submitReportForReview(id, actorId);
             auditService.logAction("SUBMITTED_REPORT", "Reports", "Report #" + id + " submitted for approval");
+            notificationService.notifyRole("REGTECH_ADMIN", "Report #" + id + " submitted for approval", "Report");
             return ResponseEntity.ok(modelMapper.map(report, RegReportDTO.class));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -76,6 +82,8 @@ public class ReportController {
             RegReport report = reportingService.approveReport(id, actorId, comments);
             auditService.logAction("APPROVED_REPORT", "Reports",
                     "Report #" + id + " approved" + (comments != null ? " | Comments: " + comments : ""));
+            notificationService.notifyRole("REPORTING_OFFICER", "Report #" + id + " approved — ready for filing", "Report");
+            notificationService.notifyRole("COMPLIANCE_ANALYST", "Report #" + id + " approved — ready for filing", "Report");
             return ResponseEntity.ok(modelMapper.map(report, RegReportDTO.class));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -88,6 +96,8 @@ public class ReportController {
         try {
             RegReport report = reportingService.fileReport(id, actorId);
             auditService.logAction("FILED_REPORT", "Reports", "Report #" + id + " filed with regulator");
+            notificationService.notifyRole("REGTECH_ADMIN", "Report #" + id + " filed with regulator", "Report");
+            notificationService.notifyRole("COMPLIANCE_ANALYST", "Report #" + id + " filed with regulator", "Report");
             return ResponseEntity.ok(modelMapper.map(report, RegReportDTO.class));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());

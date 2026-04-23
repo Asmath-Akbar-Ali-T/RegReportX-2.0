@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,8 @@ import { AuditService } from '../../services/audit.service';
 import { RiskMetric } from '../../models/risk-metric.model';
 import { RegReport } from '../../models/report.model';
 import { AuditLog } from '../../models/audit-log.model';
+import { AppNotification } from '../../models/notification.model';
+import { NotificationService } from '../../services/notification.service';
 import { finalize } from 'rxjs/operators';
 import Chart from 'chart.js/auto';
 
@@ -17,9 +19,9 @@ import Chart from 'chart.js/auto';
   standalone: true,
   imports: [CommonModule, RouterLink, FormsModule],
   templateUrl: './risk.html',
-  styleUrl: './risk.css'
+  styleUrls: ['./risk.css', '../shared/notification-panel.css']
 })
-export class RiskComponent implements OnInit {
+export class RiskComponent implements OnInit, OnDestroy {
   username = '';
   activeTab: 'overview' | 'metrics' | 'calculate' | 'reports' | 'audit' = 'overview';
   Math = Math;
@@ -60,6 +62,12 @@ export class RiskComponent implements OnInit {
   get isLoading(): boolean { return this.loadingCount > 0; }
   notification: { message: string, type: 'success' | 'error' } | null = null;
 
+  // Notifications
+  notifications: AppNotification[] = [];
+  unreadCount = 0;
+  showNotifPanel = false;
+  private notifInterval: any;
+
   // Thresholds
   thresholds: Record<string, { min?: number, max?: number }> = {
     'CRAR': { min: 9 },
@@ -73,8 +81,10 @@ export class RiskComponent implements OnInit {
     private riskService: RiskService,
     private reportService: ReportService,
     private auditService: AuditService,
+    private notifService: NotificationService,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.username = this.authService.getUsername() || 'Analyst';
   }
@@ -87,6 +97,64 @@ export class RiskComponent implements OnInit {
         this.cdr.detectChanges();
       }
     }, 5000);
+    this.pollNotifications();
+    this.notifInterval = setInterval(() => this.pollNotifications(), 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.notifInterval) clearInterval(this.notifInterval);
+  }
+
+  private run(fn: () => void): void {
+    this.ngZone.run(() => {
+      fn();
+      this.cdr.detectChanges();
+    });
+  }
+
+  // --- Notification Bell ---
+  pollNotifications(): void {
+    this.notifService.getUnreadCount().subscribe({
+      next: (res) => this.run(() => this.unreadCount = res.count),
+      error: () => {}
+    });
+  }
+  toggleNotifPanel(): void {
+    this.showNotifPanel = !this.showNotifPanel;
+    if (this.showNotifPanel) {
+      this.notifService.getNotifications().subscribe({
+        next: (data) => this.run(() => this.notifications = data),
+        error: () => {}
+      });
+    }
+  }
+  markNotifRead(id: number): void {
+    this.notifService.markAsRead(id).subscribe({
+      next: () => this.run(() => {
+        const n = this.notifications.find(x => x.notificationId === id);
+        if (n) n.status = 'READ';
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+      }),
+      error: () => {}
+    });
+  }
+  markAllNotifRead(): void {
+    this.notifService.markAllAsRead().subscribe({
+      next: () => this.run(() => {
+        this.notifications.forEach(n => n.status = 'READ');
+        this.unreadCount = 0;
+      }),
+      error: () => {}
+    });
+  }
+  getNotifIcon(category: string): string {
+    const map: Record<string, string> = {
+      'Report': 'description', 'Risk': 'trending_up', 'Validation': 'rule',
+      'Data Upload': 'upload_file', 'Ingestion': 'input', 'Exception': 'warning',
+      'Data Quality': 'verified', 'Template': 'view_column', 'Account': 'person',
+      'Raw Records': 'storage'
+    };
+    return map[category] || 'notifications';
   }
 
   private startLoading(): void {

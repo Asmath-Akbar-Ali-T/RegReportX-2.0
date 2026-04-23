@@ -6,6 +6,8 @@ import { AuthService } from '../../services/auth.service';
 import { OperationsService } from '../../services/operations.service';
 import { Loan, Deposit, TreasuryTrade, GeneralLedger, RawRecord } from '../../models/operations.model';
 import { AuditLog } from '../../models/audit-log.model';
+import { AppNotification } from '../../models/notification.model';
+import { NotificationService } from '../../services/notification.service';
 import { RawDataBatch } from '../../models/ingestion.model';
 import { Chart, registerables } from 'chart.js';
 import { forkJoin, finalize } from 'rxjs';
@@ -20,7 +22,7 @@ type UploadType = 'loans' | 'deposits' | 'treasury' | 'gl';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './operations.html',
-  styleUrl: './operations.css'
+  styleUrls: ['./operations.css', '../shared/notification-panel.css']
 })
 export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('statsChart') statsChartRef?: ElementRef<HTMLCanvasElement>;
@@ -97,12 +99,19 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   private sourceDistChart: Chart | null = null;
   private batchStatusChart: Chart | null = null;
 
+  // Notifications
+  notifications: AppNotification[] = [];
+  unreadCount = 0;
+  showNotifPanel = false;
+  private notifInterval: any;
+
   constructor(
     public authService: AuthService,
     private operationsService: OperationsService,
     private router: Router,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private notifService: NotificationService
   ) {}
 
   /**
@@ -120,6 +129,8 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.username = this.authService.getUsername() || 'Officer';
     this.loadDashboardData();
+    this.pollNotifications();
+    this.notifInterval = setInterval(() => this.pollNotifications(), 30000);
   }
 
   ngAfterViewInit(): void {
@@ -130,6 +141,7 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chartInstance?.destroy();
     this.sourceDistChart?.destroy();
     this.batchStatusChart?.destroy();
+    if (this.notifInterval) clearInterval(this.notifInterval);
   }
 
   // --- Dashboard Logic ---
@@ -530,6 +542,51 @@ export class OperationsComponent implements OnInit, AfterViewInit, OnDestroy {
       this.notification = null;
       this.cdr.detectChanges();
     }, 3000);
+  }
+
+  // --- Notification Bell ---
+  pollNotifications(): void {
+    this.notifService.getUnreadCount().subscribe({
+      next: (res) => this.run(() => this.unreadCount = res.count),
+      error: () => {}
+    });
+  }
+  toggleNotifPanel(): void {
+    this.showNotifPanel = !this.showNotifPanel;
+    if (this.showNotifPanel) {
+      this.notifService.getNotifications().subscribe({
+        next: (data) => this.run(() => this.notifications = data),
+        error: () => {}
+      });
+    }
+  }
+  markNotifRead(id: number): void {
+    this.notifService.markAsRead(id).subscribe({
+      next: () => this.run(() => {
+        const n = this.notifications.find(x => x.notificationId === id);
+        if (n) n.status = 'READ';
+        this.unreadCount = Math.max(0, this.unreadCount - 1);
+      }),
+      error: () => {}
+    });
+  }
+  markAllNotifRead(): void {
+    this.notifService.markAllAsRead().subscribe({
+      next: () => this.run(() => {
+        this.notifications.forEach(n => n.status = 'READ');
+        this.unreadCount = 0;
+      }),
+      error: () => {}
+    });
+  }
+  getNotifIcon(category: string): string {
+    const map: Record<string, string> = {
+      'Report': 'description', 'Risk': 'trending_up', 'Validation': 'rule',
+      'Data Upload': 'upload_file', 'Ingestion': 'input', 'Exception': 'warning',
+      'Data Quality': 'verified', 'Template': 'view_column', 'Account': 'person',
+      'Raw Records': 'storage'
+    };
+    return map[category] || 'notifications';
   }
 
   // --- Charts ---

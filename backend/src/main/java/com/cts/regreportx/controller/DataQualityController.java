@@ -5,6 +5,7 @@ import com.cts.regreportx.dto.DataQualityResolveRequest;
 import com.cts.regreportx.model.DataQualityIssue;
 import com.cts.regreportx.service.AuditService;
 import com.cts.regreportx.service.DataQualityService;
+import com.cts.regreportx.service.NotificationService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +25,14 @@ public class DataQualityController {
     private final DataQualityService dataQualityService;
     private final ModelMapper modelMapper;
     private final AuditService auditService;
+    private final NotificationService notificationService;
 
     @Autowired
-    public DataQualityController(DataQualityService dataQualityService, ModelMapper modelMapper, AuditService auditService) {
+    public DataQualityController(DataQualityService dataQualityService, ModelMapper modelMapper, AuditService auditService, NotificationService notificationService) {
         this.dataQualityService = dataQualityService;
         this.modelMapper = modelMapper;
         this.auditService = auditService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping("/issues")
@@ -48,6 +51,8 @@ public class DataQualityController {
             java.util.Map<String, Object> resolvedData = dataQualityService.resolveIssue(id, request);
             auditService.logAction("RESOLVED_QUALITY_ISSUE", "DataQuality",
                     "Issue #" + id + " | Justification: " + request.getJustification());
+            notificationService.notifyRole("COMPLIANCE_ANALYST", "Data quality issue #" + id + " resolved", "Data Quality");
+            notificationService.notifyRole("REPORTING_OFFICER", "Data quality issue #" + id + " resolved — clean data available", "Data Quality");
             return ResponseEntity.ok(Map.of(
                     "message", "Issue resolved successfully and CorrectionLog generated.",
                     "issue", resolvedData.get("issue"),
