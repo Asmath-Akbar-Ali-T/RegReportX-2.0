@@ -1,6 +1,5 @@
 package com.cts.regreportx.model;
 
-
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import jakarta.persistence.Column;

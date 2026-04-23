@@ -250,10 +250,13 @@
                   <td>
                     <button class="action-btn small"
                             [class.success]="isBatchConverted(batch)"
-                            [class.primary]="!isBatchConverted(batch)"
+                            [class.primary]="!isBatchConverted(batch) && !checkingConversionStatus"
+                            [class.outline]="checkingConversionStatus && !isBatchConverted(batch)"
                             (click)="loadRawRecordsForConversion(batch.batchId)"
-                            [disabled]="isBatchConverted(batch) || isConvertingRawRecords">
-                      @if (isBatchConverted(batch)) {
+                            [disabled]="isBatchConverted(batch) || isConvertingRawRecords || checkingConversionStatus">
+                      @if (checkingConversionStatus) {
+                        <span class="material-icons" style="font-size:15px;animation:spin 1s linear infinite">sync</span> Checking…
+                      } @else if (isBatchConverted(batch)) {
                         <span class="material-icons" style="font-size:15px">check_circle</span> Converted
                       } @else if (convertingBatchId === batch.batchId) {
                         Converting...
@@ -400,8 +403,11 @@
                   </td>
                   <td><span class="type-badge">{{ log.resource }}</span></td>
                   <td>
-                    <span class="audit-metadata" *ngIf="log.metadata">{{ log.metadata }}</span>
-                    <span class="audit-metadata audit-no-detail" *ngIf="!log.metadata">—</span>
+                    @if (log.metadata) {
+                      <span class="audit-metadata">{{ log.metadata }}</span>
+                    } @else {
+                      <span class="audit-metadata audit-no-detail">—</span>
+                    }
                   </td>
                 </tr>
               }

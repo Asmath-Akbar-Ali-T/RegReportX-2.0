@@ -6,9 +6,11 @@ import { AuthService } from '../../services/auth.service';
 import { TemplateService } from '../../services/template.service';
 import { ReportService } from '../../services/report.service';
 import { UserService } from '../../services/user.service';
+import { AuditService } from '../../services/audit.service';
 import { RegTemplate, TemplateField } from '../../models/template.model';
 import { RegReport } from '../../models/report.model';
 import { User } from '../../models/user.model';
+import { AuditLog } from '../../models/audit-log.model';
 import { Chart, registerables } from 'chart.js';
 import { finalize } from 'rxjs';
 
@@ -30,7 +32,7 @@ export class AdminComponent implements OnInit, AfterViewInit {
   isLoadingReports = false;
   approvingReportId: number | null = null;
 
-  activeTab: 'templates' | 'fields' | 'reports' | 'users' | 'charts' = 'templates';
+  activeTab: 'templates' | 'fields' | 'reports' | 'users' | 'charts' | 'audit' = 'templates';
   username: string | null = '';
 
   // Templates
@@ -100,11 +102,19 @@ export class AdminComponent implements OnInit, AfterViewInit {
   // Notification
   notification: { message: string; type: 'success' | 'error' } | null = null;
 
+  // Audit Log
+  auditLogs: AuditLog[] = [];
+  isLoadingAudit = false;
+  auditSearchTerm = '';
+  auditPage = 1;
+  readonly auditPageSize = 10;
+
   constructor(
     public authService: AuthService,
     private templateService: TemplateService,
     private reportService: ReportService,
     private userService: UserService,
+    private auditService: AuditService,
     private router: Router,
     private cdr: ChangeDetectorRef,
     private ngZone: NgZone
@@ -134,7 +144,7 @@ export class AdminComponent implements OnInit, AfterViewInit {
   }
 
   // --- Tab Management ---
-  switchTab(tab: 'templates' | 'fields' | 'reports' | 'users' | 'charts'): void {
+  switchTab(tab: 'templates' | 'fields' | 'reports' | 'users' | 'charts' | 'audit'): void {
     this.activeTab = tab;
     if (tab === 'fields') {
       this.selectAllFields();
@@ -147,6 +157,9 @@ export class AdminComponent implements OnInit, AfterViewInit {
     }
     if (tab === 'charts' && !this.chartsInitialized) {
       setTimeout(() => this.initCharts(), 300);
+    }
+    if (tab === 'audit') {
+      this.loadAuditLogs();
     }
   }
 
@@ -575,6 +588,84 @@ export class AdminComponent implements OnInit, AfterViewInit {
         }
       }
     });
+  }
+
+  // --- Audit Log ---
+  loadAuditLogs(): void {
+    this.isLoadingAudit = true;
+    this.auditService.getAuditLogs().pipe(
+      finalize(() => this.run(() => this.isLoadingAudit = false))
+    ).subscribe({
+      next: (data) => this.run(() => {
+        this.auditLogs = data;
+        this.auditPage = 1;
+      }),
+      error: () => this.run(() => this.showNotification('Failed to load audit logs', 'error'))
+    });
+  }
+
+  get filteredAuditLogs(): AuditLog[] {
+    if (!this.auditSearchTerm.trim()) return this.auditLogs;
+    const term = this.auditSearchTerm.toLowerCase();
+    return this.auditLogs.filter(log =>
+      (log.action || '').toLowerCase().includes(term) ||
+      (log.resource || '').toLowerCase().includes(term) ||
+      (log.metadata || '').toLowerCase().includes(term) ||
+      (log.user?.name || '').toLowerCase().includes(term) ||
+      (log.user?.role || '').toLowerCase().includes(term)
+    );
+  }
+
+  get paginatedAuditLogs(): AuditLog[] {
+    const start = (this.auditPage - 1) * this.auditPageSize;
+    return this.filteredAuditLogs.slice(start, start + this.auditPageSize);
+  }
+
+  get auditTotalPages(): number {
+    return Math.ceil(this.filteredAuditLogs.length / this.auditPageSize) || 1;
+  }
+
+  onAuditSearch(): void { this.auditPage = 1; this.cdr.detectChanges(); }
+  auditPrevPage(): void { if (this.auditPage > 1) { this.auditPage--; this.cdr.detectChanges(); } }
+  auditNextPage(): void { if (this.auditPage < this.auditTotalPages) { this.auditPage++; this.cdr.detectChanges(); } }
+
+  getAuditActionLabel(action: string): string {
+    const map: Record<string, string> = {
+      'GENERATE_REPORT': 'Generated Report',
+      'WORKFLOW_ADVANCE': 'Workflow Advanced',
+      'APPROVE_REPORT_WITH_COMMENTS': 'Approved Report',
+      'SUBMITTED_REPORT': 'Submitted Report',
+      'FILED_REPORT': 'Filed Report',
+      'GENERATE_REPORT_EXCEPTIONS': 'Generated Exceptions',
+      'CALCULATE_RISK_METRICS': 'Calculated Metrics',
+      'RESOLVED_QUALITY_ISSUE': 'Resolved Quality Issue',
+      'RESOLVED_EXCEPTION': 'Resolved Exception',
+      'RESOLVED_REPORT_EXCEPTION': 'Resolved Exception',
+      'RUN_INGESTION': 'Ran Ingestion',
+      'RUN_VALIDATION_ON_RAW': 'Validated Raw Data'
+    };
+    return map[action] || action.replace(/_/g, ' ');
+  }
+
+  getAuditActionClass(action: string): string {
+    if (action.includes('RESOLVED')) return 'action-resolve';
+    if (action.includes('SUBMITTED') || action.includes('FILED')) return 'action-submit';
+    if (action.includes('GENERATE') || action.includes('INGESTION')) return 'action-generate';
+    if (action.includes('CALCULATE') || action.includes('RAN') || action.includes('RUN')) return 'action-run';
+    if (action.includes('VIEWED')) return 'action-view';
+    if (action.includes('APPROVED') || action.includes('WORKFLOW')) return 'action-approve';
+    return 'action-default';
+  }
+
+  getAuditActionIcon(action: string): string {
+    if (action.includes('GENERATE') || action.includes('INGESTION')) return 'auto_awesome';
+    if (action.includes('CALCULATE') || action.includes('RUN')) return 'calculate';
+    if (action.includes('RESOLVED')) return 'check_circle';
+    if (action.includes('SUBMITTED')) return 'send';
+    if (action.includes('APPROVED') || action.includes('WORKFLOW')) return 'verified';
+    if (action.includes('FILED')) return 'publish';
+    if (action.includes('VIEWED')) return 'visibility';
+    return 'info';
   }
 
   // --- Logout ---
